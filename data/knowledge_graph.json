@@ -1,0 +1,81 @@
+{
+  "nodes": [
+    {
+      "id": "swasthik_shetty",
+      "label": "Swasthik Shetty",
+      "type": "person"
+    },
+    {
+      "id": "lunaite_ai",
+      "label": "Lunaite AI 27B",
+      "type": "concept"
+    },
+    {
+      "id": "jarvis_arch",
+      "label": "J.A.R.V.I.S. OS",
+      "type": "concept"
+    },
+    {
+      "id": "windows_access",
+      "label": "Deep PC Access",
+      "type": "tool"
+    },
+    {
+      "id": "spotify_tool",
+      "label": "Spotify Automation",
+      "type": "tool"
+    },
+    {
+      "id": "powershell_tool",
+      "label": "PowerShell REPL",
+      "type": "tool"
+    },
+    {
+      "id": "knowledge_graph_engine",
+      "label": "Live Knowledge Graph",
+      "type": "concept"
+    },
+    {
+      "id": "rtx_gpu",
+      "label": "RTX 5070 GPU",
+      "type": "tool"
+    }
+  ],
+  "links": [
+    {
+      "source": "swasthik_shetty",
+      "target": "lunaite_ai",
+      "label": "created_by"
+    },
+    {
+      "source": "lunaite_ai",
+      "target": "jarvis_arch",
+      "label": "architecture"
+    },
+    {
+      "source": "jarvis_arch",
+      "target": "windows_access",
+      "label": "controls"
+    },
+    {
+      "source": "windows_access",
+      "target": "spotify_tool",
+      "label": "subsystem"
+    },
+    {
+      "source": "windows_access",
+      "target": "powershell_tool",
+      "label": "subsystem"
+    },
+    {
+      "source": "lunaite_ai",
+      "target": "knowledge_graph_engine",
+      "label": "synthesizes"
+    },
+    {
+      "source": "lunaite_ai",
+      "target": "rtx_gpu",
+      "label": "accelerated_by"
+    }
+  ]
+}

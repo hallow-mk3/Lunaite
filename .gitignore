@@ -1,0 +1,53 @@
+# Python Bytecode & Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+venv/
+env/
+ENV/
+.venv/
+
+# IDE & OS Files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Heavy Neural Weights & Artifacts (Store in HuggingFace Hub / Git LFS)
+llama.cpp/
+lunaite_merged/
+lunaite_lora_weights/
+qwen_27b_model/
+*.bin
+*.pt
+*.pth
+*.safetensors
+*.gguf
+
+# Logs and scratch files
+*.log
+scratch/

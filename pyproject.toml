@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lunaite"
+version = "3.0.0"
+authors = [
+    { name="Swasthik Shetty", email="swasthik.mk3@gmail.com" },
+]
+description = "Lunaite — Universal Modular AI Architecture Framework (Sparse MoE, Cognitive Deliberation, Persistent Memory, Autonomous Agent Tools)"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "torch>=2.0.0",
+    "transformers>=4.40.0",
+    "peft>=0.10.0",
+    "accelerate>=0.28.0",
+    "fastapi>=0.110.0",
+    "uvicorn>=0.28.0",
+    "pydantic>=2.6.0",
+    "psutil>=5.9.0",
+    "requests>=2.31.0",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/hallow-mk3/Lunaite"
+"Repository" = "https://github.com/hallow-mk3/Lunaite.git"
+"Bug Tracker" = "https://github.com/hallow-mk3/Lunaite/issues"
+
+[project.scripts]
+lunaite = "lunaite.cli:main"
