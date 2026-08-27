@@ -27,11 +27,12 @@
 
 Lunaite transforms standard causal language models into self-reflective, multi-disciplinary cognitive agents equipped with:
 
-1. **⚡ Sparse Mixture-of-Experts (MoE) Residual Adapters**: Dynamic Top-$K$ routing with load-balancing loss, SwiGLU/GELU expert networks, and residual scaling.
-2. **🧠 Multi-Perspective Cognitive Deliberation**: Structured parallel deliberation across empirical physical sciences, formal mathematical logic, systems architecture, and philosophy.
-3. **💾 Multi-Tier Persistent Memory Bank**: Working memory buffer, timestamped episodic insight logs, and persistent semantic user fact stores.
-4. **🌐 Autonomous Live Agent & Tool Suite**: Integrated DuckDuckGo search, Wikipedia lookup, Open-Meteo real-time global weather, clean web scraping, and deep system telemetry.
-5. **🎛️ Glassmorphism Tactical Web Studio & CLI**: Real-time WebSocket hardware telemetry, live loss curves, dataset inspection, and interactive streaming chat.
+1. **⚡ Lunaite-Titan Adaptive Test-Time MoE**: Entropy-guided dynamic top-$k(x)$ routing scaling with query uncertainty $H(p(E|x))$ and Switch-style load-balancing loss.
+2. **🧠 Neuro-Symbolic PRM-MCTS Cognitive Engine**: Step-level Process Reward Model scoring, Monte Carlo Tree Search deliberation, and Formal AST verification.
+3. **⏩ Hardware-Aligned Speculative Speculation Trees**: High-throughput draft tree verification designed for Tensor Core GPUs.
+4. **💾 Multi-Tier Persistent Memory Bank**: Working memory buffer, timestamped episodic insight logs, and persistent semantic user fact stores.
+5. **🌐 Autonomous Live Agent & Tool Suite**: Integrated DuckDuckGo search, Wikipedia lookup, Open-Meteo real-time global weather, clean web scraping, and deep system telemetry.
+6. **📄 Formal Research Paper & Benchmark Suite**: LaTeX preprint (`paper/Lunaite_Titan_Architecture.tex`) and empirical evaluation harness (`eval/benchmark_harness.py`).
 
 ---
 
