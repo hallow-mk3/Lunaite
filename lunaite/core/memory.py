@@ -107,6 +107,10 @@ class LunaiteMemory:
 
         return " [Memory Bank: " + " · ".join(parts) + "]"
 
+    def get_memory_context(self) -> str:
+        """Alias for get_context_summary() for backward compatibility."""
+        return self.get_context_summary()
+
     def clear(self):
         """Reset memory bank to defaults."""
         self.data = {
