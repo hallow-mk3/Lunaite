@@ -603,6 +603,17 @@ def show_memories():
     print()
 
 
+def flush_input_buffer():
+    """Flush any keystrokes pressed while the model was streaming its response."""
+    if sys.platform == "win32":
+        try:
+            import msvcrt
+            while msvcrt.kbhit():
+                msvcrt.getch()
+        except Exception:
+            pass
+
+
 def export_conversation(history: list, model: str):
     ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"lunaite_chat_{ts}.md"
@@ -646,6 +657,7 @@ def main():
 
     while True:
         try:
+            flush_input_buffer()
             print(f"{BOLD_CYAN}╭─ You{RESET}")
             user_input = input(f"{BOLD_CYAN}╰─› {BOLD_WHITE}").strip()
             print(f"{RESET}", end="")
