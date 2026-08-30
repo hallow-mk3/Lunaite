@@ -13,5 +13,14 @@
     "internet_access": "Fully Enabled (Live Web Search, URL Fetch, Wikipedia, Real-Time APIs)"
   },
   "user_facts": {},
-  "episodic_insights": []
+  "episodic_insights": [
+    {
+      "timestamp": "2026-08-30 15:20:03",
+      "insight": "Q: hi... -> A: [Lunaite Ollama Error]: Could not reach Ollama at http://localhost:11434 (<urlop..."
+    },
+    {
+      "timestamp": "2026-08-30 15:20:56",
+      "insight": "Q: hi... -> A: [Lunaite Ollama Error]: Could not reach Ollama at http://localhost:11434 (<urlop..."
+    }
+  ]
 }

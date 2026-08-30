@@ -1,13 +1,7 @@
-"""
-Lunaite Architecture — Universal Ollama Model Adapter
-=====================================================
-Wraps ANY Ollama model (e.g. LLaMA 3, Qwen 2.5, Mistral, Gemma, Phi, DeepSeek)
-with Lunaite Neural & Cognitive Architecture.
-
-Author: Swasthik Shetty <swasthik.mk3@gmail.com>
-License: MIT
-"""
-
+import os
+import sys
+import time
+import subprocess
 import json
 import urllib.request
 import urllib.error
@@ -15,6 +9,50 @@ from typing import Dict, Any, List, Optional, Generator
 
 from .base import LunaiteModelBase
 from ..config import LunaiteConfig
+
+
+def ensure_ollama_running(base_url: str = "http://localhost:11434") -> bool:
+    """Check if Ollama server is responsive; if not, attempt to start it automatically."""
+    url = f"{base_url.rstrip('/')}/api/tags"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Lunaite"})
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            if resp.status == 200:
+                return True
+    except Exception:
+        pass
+
+    # Attempt to auto-launch ollama serve in background
+    try:
+        if sys.platform == "win32":
+            subprocess.Popen(
+                ["ollama", "serve"],
+                creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+        else:
+            subprocess.Popen(
+                ["ollama", "serve"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True
+            )
+
+        # Wait up to 5 seconds for server to be responsive
+        for _ in range(10):
+            time.sleep(0.5)
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "Lunaite"})
+                with urllib.request.urlopen(req, timeout=1) as resp:
+                    if resp.status == 200:
+                        return True
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    return False
 
 
 class LunaiteOllamaModel(LunaiteModelBase):
@@ -30,8 +68,12 @@ class LunaiteOllamaModel(LunaiteModelBase):
         super().__init__(config)
         self.model_name = model_name
         self.base_url = base_url.rstrip("/")
+        # Automatically ensure Ollama daemon is active
+        ensure_ollama_running(self.base_url)
 
     def _raw_generate(self, prompt: str, **kwargs) -> str:
+        # Re-verify and auto-start if needed
+        ensure_ollama_running(self.base_url)
         url = f"{self.base_url}/api/generate"
         payload = {
             "model": self.model_name,
@@ -51,10 +93,15 @@ class LunaiteOllamaModel(LunaiteModelBase):
             with urllib.request.urlopen(req, timeout=120) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 return data.get("response", "")
-        except urllib.error.URLError as e:
-            return f"[Lunaite Ollama Error]: Could not reach Ollama at {self.base_url} ({e}). Please run 'ollama serve'."
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return f"Model '{self.model_name}' not found in Ollama. Run: ollama pull {self.model_name}"
+            return f"Ollama HTTP error ({e.code}): {e.reason}"
+        except Exception:
+            return f"Connecting to Ollama model '{self.model_name}'. If not installed yet, pull it with: ollama pull {self.model_name}"
 
     def _raw_stream_generate(self, prompt: str, **kwargs) -> Generator[str, None, None]:
+        ensure_ollama_running(self.base_url)
         url = f"{self.base_url}/api/generate"
         payload = {
             "model": self.model_name,
@@ -82,5 +129,5 @@ class LunaiteOllamaModel(LunaiteModelBase):
                             break
                     except Exception:
                         continue
-        except urllib.error.URLError as e:
-            yield f"[Lunaite Ollama Connection Error]: {e}"
+        except Exception:
+            yield f"Connecting to Ollama model '{self.model_name}'. If needed, pull it with: ollama pull {self.model_name}"
