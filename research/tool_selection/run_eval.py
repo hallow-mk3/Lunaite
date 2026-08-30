@@ -12,26 +12,14 @@ Usage
 
 Options
 -------
-    --model         Ollama model name          (default: qwen3:8b)
-    --registry-sizes  Space-separated ints     (default: 10 25 50)
-    --k-values        Space-separated ints     (default: 3 5 10)
-    --tasks-file      Path to eval_tasks.jsonl (default: ./eval_tasks.jsonl)
-    --out-dir         Output directory         (default: ./results)
+    --model           Model name                 (default: qwen2.5:7b)
+    --registry-sizes  Space-separated ints       (default: 10 25 50)
+    --k-values        Space-separated ints       (default: 3 5 10)
+    --tasks-file      Path to eval_tasks.jsonl   (default: ./eval_tasks.jsonl)
+    --out-dir         Output directory           (default: ./results)
     --dry-run         Run only first 5 tasks per condition (for testing)
-    --base-url        Ollama base URL          (default: http://localhost:11434/v1)
-
-Output
-------
-    results/raw_results_<timestamp>.jsonl   — one JSON line per task×condition×size
-
-Each line fields:
-    task_id, case_type, query, correct_tool, correct_args,
-    registry_size, condition, k,
-    tools_shown, tool_called, arguments_generated, no_tool_called,
-    tool_correct, args_correct, full_success,
-    prompt_tokens, completion_tokens, total_tokens, latency_s,
-    execution_result, execution_error, execution_success,
-    selector_name, model, error
+    --base-url        OpenAI-compatible base URL (default: http://localhost:11434/v1)
+    --api-key         API Key if required        (default: env OPENAI_API_KEY)
 """
 from __future__ import annotations
 
@@ -68,64 +56,55 @@ def _normalise_args(args: Optional[Dict]) -> Optional[Dict]:
         if isinstance(v, (int, float)):
             out[k] = float(v)
         elif isinstance(v, list):
-            out[k] = [float(x) if isinstance(x, (int, float)) else x for x in v]
+            out[k] = [float(x) if isinstance(x, (int, float)) else str(x).lower().strip() for x in v]
+        elif isinstance(v, str):
+            out[k] = v.strip().lower()
         else:
             out[k] = v
     return out
 
 
-def _args_correct(generated: Optional[Dict], expected: Optional[Dict]) -> bool:
-    """Return True if generated args match expected (numeric-tolerant)."""
-    if expected is None:
-        return generated is None or generated == {}
-    if generated is None:
-        return False
-    gen_n = _normalise_args(generated)
-    exp_n = _normalise_args(expected)
-    if set(gen_n.keys()) != set(exp_n.keys()):
-        return False
-    for k in exp_n:
-        g, e = gen_n[k], exp_n[k]
-        if isinstance(e, float) and isinstance(g, float):
-            if abs(g - e) > max(1e-3 * abs(e), 1e-6):
-                return False
-        elif isinstance(e, list) and isinstance(g, list):
-            if len(g) != len(e):
-                return False
-            for gi, ei in zip(g, e):
-                if isinstance(ei, float) and isinstance(gi, float):
-                    if abs(gi - ei) > max(1e-3 * abs(ei), 1e-6):
-                        return False
-                elif gi != ei:
-                    return False
-        elif g != e:
-            return False
-    return True
+def evaluate_result(result: HarnessResult, task: Dict) -> Dict[str, bool]:
+    """Score a single HarnessResult against ground truth task definition."""
+    expected_tool: Optional[str] = task["correct_tool"]
+    expected_args: Optional[Dict] = task["correct_args"]
 
-
-def evaluate_result(result: HarnessResult, task: Dict) -> Dict:
-    """Compute correctness metrics for one task result."""
-    correct_tool = task["correct_tool"]
-    correct_args = task["correct_args"]
-
-    # Tool selection correct?
-    if correct_tool is None:
-        # Correct behaviour = no tool called
-        tool_correct = result.no_tool_called
+    # 1. Tool selection correctness
+    if expected_tool is None:
+        # Negative / trick case: correct behavior is to call NO tool
+        tool_correct = (result.tool_called is None) or result.no_tool_called
     else:
-        tool_correct = result.tool_called == correct_tool
+        tool_correct = (result.tool_called == expected_tool)
 
-    # Argument correctness (only meaningful if tool was correct)
-    if tool_correct and correct_tool is not None:
-        args_correct = _args_correct(result.arguments_generated, correct_args)
-    else:
+    # 2. Arguments correctness
+    if expected_tool is None:
+        args_correct = True
+    elif not tool_correct:
         args_correct = False
-
-    # Full success = tool correct AND args correct (or no-tool correct)
-    if correct_tool is None:
-        full_success = tool_correct
+    elif expected_args is None:
+        args_correct = True
     else:
-        full_success = tool_correct and args_correct
+        gen_norm = _normalise_args(result.arguments_generated)
+        exp_norm = _normalise_args(expected_args)
+        if gen_norm is None:
+            args_correct = False
+        else:
+            args_correct = True
+            for k, exp_val in exp_norm.items():
+                if k not in gen_norm:
+                    args_correct = False
+                    break
+                gen_val = gen_norm[k]
+                if isinstance(exp_val, float) and isinstance(gen_val, float):
+                    if abs(exp_val - gen_val) > 1e-3:
+                        args_correct = False
+                        break
+                elif gen_val != exp_val:
+                    args_correct = False
+                    break
+
+    # 3. Full task success
+    full_success = tool_correct and args_correct
 
     return {
         "tool_correct": tool_correct,
@@ -135,7 +114,7 @@ def evaluate_result(result: HarnessResult, task: Dict) -> Dict:
 
 
 # ─────────────────────────────────────────────────────────────────────────── #
-# Main runner                                                                   #
+# Main eval loop                                                                #
 # ─────────────────────────────────────────────────────────────────────────── #
 
 
@@ -146,42 +125,54 @@ def run_eval(
     tasks: List[Dict],
     out_path: Path,
     base_url: str = "http://localhost:11434/v1",
+    api_key: Optional[str] = None,
     dry_run: bool = False,
 ) -> None:
+    """Run full evaluation matrix across conditions, sizes, and tasks."""
     if dry_run:
         tasks = tasks[:5]
-        print(f"[DRY RUN] Using {len(tasks)} tasks only.")
+        print(f"[DRY RUN] Truncated to {len(tasks)} tasks.")
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    retrieval_selector = RetrievalSelector(k=max(k_values))  # model loaded once
 
-    total_conditions = len(registry_sizes) * (1 + len(k_values))
-    total_calls = len(tasks) * total_conditions
-    print(
-        f"Running {len(tasks)} tasks × {total_conditions} conditions"
-        f" = {total_calls} LLM calls. Model: {model}"
-    )
-    print(f"Registry sizes: {registry_sizes}  |  k values: {k_values}")
-    print(f"Output: {out_path}\n")
-
+    total_conditions = 1 + len(k_values)
+    total_calls = len(registry_sizes) * total_conditions * len(tasks)
     call_num = 0
+
+    print(f"\nStarting evaluation:")
+    print(f"  Model:           {model}")
+    print(f"  Base URL:        {base_url}")
+    print(f"  Registry sizes:  {registry_sizes}")
+    print(f"  Retrieval k:     {k_values}")
+    print(f"  Tasks count:     {len(tasks)}")
+    print(f"  Total LLM calls: {total_calls}")
+    print(f"  Output path:     {out_path}\n")
+
     t_run_start = time.perf_counter()
 
     with open(out_path, "w", encoding="utf-8") as fout:
         for size in registry_sizes:
             registry = build_registry(size)
-            print(f"\n{'='*60}")
-            print(f"Registry size: {size} tools")
-            print(f"{'='*60}")
+            naive_selector = NaiveSelector(registry)
+            retrieval_selector = RetrievalSelector(registry)
 
-            # ── Naive condition ─────────────────────────────────────── #
+            # ── 1. Naive condition ──────────────────────────────────── #
             naive_harness = Harness(
                 registry=registry,
-                selector=NaiveSelector(),
+                selector=naive_selector,
                 model=model,
                 base_url=base_url,
+                api_key=api_key,
             )
-            print(f"\n[Naive] registry={size}")
+
+            # Connection check
+            if call_num == 0 and not naive_harness.check_connection():
+                print(
+                    f"WARNING: Could not connect to LLM endpoint at {base_url}/models\n"
+                    f"Please ensure Ollama is running (`ollama run {model}`) or verify `--base-url`.\n"
+                )
+
+            print(f"\n[Naive Selection] registry_size={size}")
             for task in tasks:
                 call_num += 1
                 result = naive_harness.run(task["query"])
@@ -204,7 +195,7 @@ def run_eval(
                 fout.write(json.dumps(row) + "\n")
                 fout.flush()
                 elapsed = time.perf_counter() - t_run_start
-                eta = (elapsed / call_num) * (total_calls - call_num)
+                eta = (elapsed / max(1, call_num)) * (total_calls - call_num)
                 status = "[OK]" if metrics["full_success"] else "[FAIL]"
                 print(
                     f"  [{call_num}/{total_calls}] {status} {task['id']:<6}"
@@ -213,15 +204,16 @@ def run_eval(
                     f" ETA={eta/60:.1f}m"
                 )
 
-            # ── Retrieval conditions (one per k) ────────────────────── #
+            # ── 2. Retrieval conditions (per k) ─────────────────────── #
             for k in k_values:
                 retrieval_harness = Harness(
                     registry=registry,
                     selector=retrieval_selector,
                     model=model,
                     base_url=base_url,
+                    api_key=api_key,
                 )
-                print(f"\n[Retrieval k={k}] registry={size}")
+                print(f"\n[Retrieval k={k}] registry_size={size}")
                 for task in tasks:
                     call_num += 1
                     result = retrieval_harness.run(task["query"], selector_kwargs={"k": k})
@@ -244,7 +236,7 @@ def run_eval(
                     fout.write(json.dumps(row) + "\n")
                     fout.flush()
                     elapsed = time.perf_counter() - t_run_start
-                    eta = (elapsed / call_num) * (total_calls - call_num)
+                    eta = (elapsed / max(1, call_num)) * (total_calls - call_num)
                     status = "[OK]" if metrics["full_success"] else "[FAIL]"
                     print(
                         f"  [{call_num}/{total_calls}] {status} {task['id']:<6}"
@@ -266,16 +258,16 @@ def main() -> None:
     here = Path(__file__).parent
 
     parser = argparse.ArgumentParser(description="Run tool-selection eval")
-    parser.add_argument("--model", default="qwen3:8b")
+    parser.add_argument("--model", default="qwen2.5:7b")
     parser.add_argument("--registry-sizes", nargs="+", type=int, default=[10, 25, 50])
     parser.add_argument("--k-values", nargs="+", type=int, default=[3, 5, 10])
     parser.add_argument("--tasks-file", default=str(here / "eval_tasks.jsonl"))
     parser.add_argument("--out-dir", default=str(here / "results"))
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--base-url", default="http://localhost:11434/v1")
+    parser.add_argument("--api-key", default=None)
     args = parser.parse_args()
 
-    # Load tasks
     tasks_path = Path(args.tasks_file)
     if not tasks_path.exists():
         print(f"ERROR: tasks file not found: {tasks_path}", file=sys.stderr)
@@ -293,6 +285,7 @@ def main() -> None:
         tasks=tasks,
         out_path=out_path,
         base_url=args.base_url,
+        api_key=args.api_key,
         dry_run=args.dry_run,
     )
 

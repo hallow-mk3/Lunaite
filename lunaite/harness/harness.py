@@ -5,28 +5,16 @@ Harness — main orchestration class.
 
 Given a user query, a ToolRegistry, and a Selector, the Harness:
   1. Selects a subset of tools via the selector.
-  2. Calls the LLM (Ollama OpenAI-compatible endpoint) with the query
+  2. Calls the LLM (OpenAI-compatible / Ollama endpoint) with the query
      and selected tool schemas.
   3. Parses the tool call from the response.
   4. Executes the tool callable.
   5. Returns a structured HarnessResult with every step logged.
-
-LLM Backend
------------
-Uses Ollama's OpenAI-compatible API (``/v1/chat/completions``) via the
-``openai`` Python client pointed at ``http://localhost:11434/v1``.
-If the ``openai`` package is not installed, falls back to direct HTTP
-via ``requests``.
-
-Logging
--------
-Every call produces a ``HarnessResult`` (a plain dataclass) that is fully
-JSON-serialisable.  Callers (e.g. run_eval.py) are responsible for writing
-these to disk.
 """
 from __future__ import annotations
 
 import json
+import os
 import time
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional
@@ -57,14 +45,14 @@ class HarnessResult:
     model: str
 
     # Selection step
-    tools_shown: List[str] = field(default_factory=list)   # tool names shown to LLM
+    tools_shown: List[str] = field(default_factory=list)
     n_tools_shown: int = 0
 
     # LLM response
-    raw_response: Optional[str] = None          # full JSON string from the API
-    tool_called: Optional[str] = None           # name the model called
-    arguments_generated: Optional[Dict] = None  # parsed arguments dict
-    no_tool_called: bool = False                # True = model declined to call any tool
+    raw_response: Optional[str] = None
+    tool_called: Optional[str] = None
+    arguments_generated: Optional[Dict[str, Any]] = None
+    no_tool_called: bool = False
 
     # Execution
     execution_result: Optional[Any] = None
@@ -99,9 +87,11 @@ class Harness:
     selector:
         A :class:`~lunaite.selection.base.Selector` instance.
     model:
-        Ollama model name (e.g. ``"qwen3:8b"``).
+        Model name (e.g. ``"qwen2.5:7b"`` or ``"gpt-4o-mini"``).
     base_url:
-        Ollama OpenAI-compatible base URL.
+        OpenAI-compatible base URL.
+    api_key:
+        Optional API key (defaults to ``OPENAI_API_KEY`` env variable).
     temperature:
         Sampling temperature for the LLM.
     timeout:
@@ -112,8 +102,9 @@ class Harness:
         self,
         registry: ToolRegistry,
         selector: Selector,
-        model: str = "qwen3:8b",
+        model: str = "qwen2.5:7b",
         base_url: str = "http://localhost:11434/v1",
+        api_key: Optional[str] = None,
         temperature: float = 0.0,
         timeout: int = 120,
     ) -> None:
@@ -121,12 +112,28 @@ class Harness:
         self.selector = selector
         self.model = model
         self.base_url = base_url.rstrip("/")
+        self.api_key = api_key or os.getenv("OPENAI_API_KEY", "")
         self.temperature = temperature
         self.timeout = timeout
 
     # ------------------------------------------------------------------ #
     # Public API                                                           #
     # ------------------------------------------------------------------ #
+
+    def check_connection(self) -> bool:
+        """Check if the backend LLM endpoint is reachable."""
+        try:
+            headers = {"Content-Type": "application/json"}
+            if self.api_key:
+                headers["Authorization"] = f"Bearer {self.api_key}"
+            resp = requests.get(
+                f"{self.base_url}/models",
+                headers=headers,
+                timeout=5,
+            )
+            return resp.status_code == 200
+        except Exception:
+            return False
 
     def run(self, query: str, selector_kwargs: Optional[Dict] = None) -> HarnessResult:
         """Execute one full query → tool-call cycle.
@@ -170,35 +177,39 @@ class Harness:
             result.total_tokens = usage.get("total_tokens", 0)
 
             # ── Step 4: parse tool call ──────────────────────────────── #
-            choice = api_response["choices"][0]
-            message = choice["message"]
-            tool_calls = message.get("tool_calls") or []
-
-            if not tool_calls:
+            choices = api_response.get("choices", [])
+            if not choices:
                 result.no_tool_called = True
             else:
-                tc = tool_calls[0]  # we only handle the first call
-                fn = tc["function"]
-                result.tool_called = fn["name"]
-                raw_args = fn.get("arguments", "{}")
-                result.arguments_generated = (
-                    json.loads(raw_args) if isinstance(raw_args, str) else raw_args
-                )
+                choice = choices[0]
+                message = choice.get("message", {})
+                tool_calls = message.get("tool_calls") or []
 
-                # ── Step 5: execute ───────────────────────────────────── #
-                tool = self.registry.get(result.tool_called)
-                if tool is None:
-                    result.execution_error = (
-                        f"Model called unknown tool: {result.tool_called!r}"
-                    )
+                if not tool_calls:
+                    result.no_tool_called = True
                 else:
-                    try:
-                        result.execution_result = tool.call(
-                            **result.arguments_generated
+                    tc = tool_calls[0]
+                    fn = tc.get("function", {})
+                    result.tool_called = fn.get("name")
+                    raw_args = fn.get("arguments", "{}")
+                    result.arguments_generated = (
+                        json.loads(raw_args) if isinstance(raw_args, str) else raw_args
+                    )
+
+                    # ── Step 5: execute ───────────────────────────────────── #
+                    tool = self.registry.get(result.tool_called)
+                    if tool is None:
+                        result.execution_error = (
+                            f"Model called unknown tool: {result.tool_called!r}"
                         )
-                        result.execution_success = True
-                    except Exception as exc:
-                        result.execution_error = f"{type(exc).__name__}: {exc}"
+                    else:
+                        try:
+                            result.execution_result = tool.call(
+                                **result.arguments_generated
+                            )
+                            result.execution_success = True
+                        except Exception as exc:
+                            result.execution_error = f"{type(exc).__name__}: {exc}"
 
         except Exception as exc:
             result.error = f"{type(exc).__name__}: {exc}"
@@ -212,10 +223,7 @@ class Harness:
     # ------------------------------------------------------------------ #
 
     def _call_llm(self, query: str, tools: List[Tool]) -> Dict:
-        """Call the Ollama OpenAI-compatible /v1/chat/completions endpoint.
-
-        Returns the raw response dict.
-        """
+        """Call the OpenAI-compatible /v1/chat/completions endpoint."""
         payload: Dict[str, Any] = {
             "model": self.model,
             "messages": [{"role": "user", "content": query}],
@@ -226,11 +234,15 @@ class Harness:
         if tools:
             payload["tools"] = [t.to_openai_schema() for t in tools]
 
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
         resp = requests.post(
             f"{self.base_url}/chat/completions",
             json=payload,
             timeout=self.timeout,
-            headers={"Content-Type": "application/json"},
+            headers=headers,
         )
         resp.raise_for_status()
         return resp.json()
