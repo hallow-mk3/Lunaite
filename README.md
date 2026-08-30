@@ -203,24 +203,20 @@ generate_diagram_html(
 
 ## 8. Command Line Interface (CLI)
 
-Interact directly from your terminal:
+Run interactive chat and utilities directly from your terminal:
 
 ```bash
 # Terminal chat with any model
-lunaite run qwen2.5:7b
-# or via python module directly:
 python -m lunaite.cli run qwen2.5:7b
 
 # Terminal chat with deep deliberation
-lunaite run llama3.1:8b --deliberate
-# or:
 python -m lunaite.cli run llama3.1:8b --deliberate
 
 # View hardware stats and diagnostics
-lunaite info
-# or:
 python -m lunaite.cli info
 ```
+
+*(Note: If you have Python's Scripts folder in your system PATH, you can also use `lunaite run qwen2.5:7b` directly).*
 
 ---
 
@@ -230,10 +226,10 @@ Fine-tune models with LoRA and MoE adapters and merge weights:
 
 ```bash
 # Train on a dataset
-lunaite train --base-model Qwen/Qwen2.5-7B --dataset data/lunaite_training_data.jsonl --epochs 3
+python -m lunaite.cli train --base-model Qwen/Qwen2.5-7B --dataset data/lunaite_training_data.jsonl --epochs 3
 
 # Merge adapter weights into a standalone model
-lunaite merge --base-model Qwen/Qwen2.5-7B --adapter ./lunaite_weights --output ./lunaite_merged
+python -m lunaite.cli merge --base-model Qwen/Qwen2.5-7B --adapter ./lunaite_weights --output ./lunaite_merged
 ```
 
 ---
