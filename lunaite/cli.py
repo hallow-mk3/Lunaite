@@ -122,14 +122,23 @@ def run_chat_cli(model_name: str = "qwen2.5:7b", deliberate: bool = False):
                 response = model.generate(user_input, use_deliberation=False, use_agent=True)
                 print(f"{response}\n")
             else:
-                # Streaming token generation for conversational speed
+                # Streaming token generation with full system persona and memory context
                 full_tokens = []
                 try:
-                    for chunk in model._raw_stream_generate(user_input):
+                    memory_ctx = model.memory.get_context_summary() if model.memory else ""
+                    system_prompt = model.cognitive.get_system_prompt(memory_ctx) if model.cognitive else ""
+                    full_prompt = f"{system_prompt}\n\nUser: {user_input}\nLunaite AI:" if system_prompt else user_input
+
+                    for chunk in model._raw_stream_generate(full_prompt):
                         sys.stdout.write(chunk)
                         sys.stdout.flush()
                         full_tokens.append(chunk)
                     print("\n")
+
+                    # Record response into memory
+                    full_text = "".join(full_tokens).strip()
+                    if model.memory and len(full_text.split()) > 8:
+                        model.memory.add_insight(f"Q: {user_input[:50]} -> A: {full_text[:70]}")
                 except Exception:
                     response = model.generate(user_input, use_deliberation=False, use_agent=False)
                     print(f"{response}\n")

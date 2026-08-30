@@ -45,30 +45,51 @@ class LunaiteAgent:
         if url_match:
             return ("fetch_url", url_match.group(1))
 
-        # 2. Weather
+        # 2. File Reading
+        file_read_match = re.search(r'(?:read|open|show|view|inspect)\s+(?:the\s+)?(?:file|code)?\s*([a-zA-Z0-9_\-\./\\]+\.[a-zA-Z0-9_]+)', prompt, re.IGNORECASE)
+        if file_read_match:
+            return ("read_file", file_read_match.group(1))
+
+        # 3. File Writing / Creation
+        file_write_match = re.search(r'(?:create|write|save)\s+(?:file|to)?\s*([a-zA-Z0-9_\-\./\\]+\.[a-zA-Z0-9_]+)\s*(?:with|as)?\s*[:\n](.+)', prompt, re.IGNORECASE | re.DOTALL)
+        if file_write_match:
+            return ("write_file", f"{file_write_match.group(1)} ::: {file_write_match.group(2)}")
+
+        # 4. Weather
         if any(w in prompt_lower for w in ["weather in ", "weather for ", "weather of "]):
             loc = re.split(r'weather (?:in|for|of) ', prompt, flags=re.IGNORECASE)[-1].strip("?.! ")
             return ("weather", loc if loc else "London")
 
-        # 3. Screenshot
+        # 5. Shell / PowerShell execution
+        cmd_match = re.search(r'(?:run command|execute command|run shell|run powershell|execute)\s*[:\s]+`?([^`\n]+)`?', prompt, re.IGNORECASE)
+        if cmd_match:
+            return ("powershell", cmd_match.group(1).strip())
+
+        # 6. Screenshot
         if any(k in prompt_lower for k in ["take a screenshot", "capture screen", "screenshot"]):
             return ("screenshot", "")
 
-        # 4. Clipboard
+        # 7. Clipboard
         if any(k in prompt_lower for k in ["read clipboard", "what's on my clipboard", "clipboard content"]):
             return ("clipboard_read", "")
 
-        # 5. System Telemetry
-        if any(k in prompt_lower for k in ["system vitals", "system telemetry", "hardware stats", "ram usage", "cpu usage"]):
+        # 8. System Telemetry & Vitals
+        if any(k in prompt_lower for k in ["system vitals", "system telemetry", "hardware stats", "ram usage", "cpu usage", "system info"]):
             return ("telemetry", "")
 
-        # 6. Live Web Search Triggers
+        # 9. Wikipedia Lookup
+        if prompt_lower.startswith("who was ") or prompt_lower.startswith("what is ") and "weather" not in prompt_lower:
+            topic = re.sub(r'^(?:who was|what is)\s+', '', prompt_lower, flags=re.IGNORECASE).strip("?.! ")
+            if len(topic.split()) <= 4:
+                return ("wiki", topic)
+
+        # 10. Live Web Search Triggers
         if self.config.auto_web_search:
             search_triggers = [
                 "search the web for", "search for", "google", "look up",
                 "latest news", "current price", "today's", "recent developments",
                 "what is the latest", "who is the current", "what happened in",
-                "browse"
+                "browse", "news on", "search"
             ]
             for trig in search_triggers:
                 if trig in prompt_lower:
