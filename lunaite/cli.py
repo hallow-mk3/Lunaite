@@ -202,6 +202,7 @@ def run_chat_cli(
     model = wrap(model_name, backend=backend)
 
     last_web_topic = ""  # Track last search subject for pronoun follow-ups
+    session_history = []  # (role, text) pairs for /history command
     while True:
         try:
             prompt_symbol = f"{CYAN_BRIGHT}{C_BOLD}❯{C_RESET} "
@@ -225,10 +226,24 @@ def run_chat_cli(
             elif cmd_lower in ["/help", "/?"]:
                 print(f"\n{WHITE_BOLD}Lunaite Commands:{C_RESET}")
                 print(f"  {CYAN_MAIN}/tools{C_RESET}       - List all available tools & triggers")
+                print(f"  {CYAN_MAIN}/history{C_RESET}     - Show this session's conversation")
                 print(f"  {CYAN_MAIN}/deliberate{C_RESET}  - Toggle multi-perspective reasoning")
                 print(f"  {CYAN_MAIN}/clear{C_RESET}       - Clear conversation memory buffer")
                 print(f"  {CYAN_MAIN}/info{C_RESET}        - Show live hardware and system vitals")
                 print(f"  {CYAN_MAIN}/exit{C_RESET}        - Exit session\n")
+                continue
+            elif cmd_lower == "/history":
+                if not session_history:
+                    print(f"{SLATE_DARK}No conversation history yet.{C_RESET}\n")
+                else:
+                    print(f"\n{WHITE_BOLD}Session History:{C_RESET}")
+                    for i, (role, text) in enumerate(session_history, 1):
+                        role_color = CYAN_BRIGHT if role == "You" else CYAN_MAIN
+                        prefix = f"{role_color}{C_BOLD}{role}{C_RESET}"
+                        snippet = text[:120].replace("\n", " ")
+                        suffix = "..." if len(text) > 120 else ""
+                        print(f"  {SLATE_DARK}{i:>2}.{C_RESET} {prefix}: {snippet}{suffix}")
+                    print()
                 continue
             elif cmd_lower == "/tools":
                 print(f"\n{WHITE_BOLD}Available Lunaite Tools:{C_RESET}")
@@ -249,6 +264,9 @@ def run_chat_cli(
                 print(f"  {SLATE}GPU:{C_RESET} {stats['gpu_name']} ({stats['gpu_vram_used_gb']} GB VRAM)")
                 print(f"  {SLATE}Disk:{C_RESET} {stats['disk_free_gb']} GB free\n")
                 continue
+
+            # Track user input in session history
+            session_history.append(("You", user_input))
 
             # Response header
             print(f"\n{CYAN_MAIN}{C_BOLD}● Lunaite{C_RESET}")
@@ -298,6 +316,23 @@ def run_chat_cli(
                 full_text = "".join(full_tokens).strip()
                 if model.memory and len(full_text.split()) > 8:
                     model.memory.add_insight(f"Q: {user_input[:50]} -> A: {full_text[:70]}")
+                session_history.append(("Lunaite", full_text))
+
+                # Auto-detect file path in clipboard output and offer to read it
+                if intent[0] == "clipboard_read":
+                    import re as _re, os as _os
+                    path_match = _re.search(r'([A-Za-z]:\\[^\n\r"<>|*?]{3,})', tool_output)
+                    if path_match:
+                        fpath = path_match.group(1).strip()
+                        if _os.path.isfile(fpath):
+                            ext = _os.path.splitext(fpath)[1].lower()
+                            if ext in (".txt", ".md", ".py", ".json", ".csv", ".log", ".yaml", ".toml"):
+                                print(f"{SLATE_DARK}↳ Auto-reading text file from clipboard...{C_RESET}")
+                                file_contents = model.agent.execute_tool("read_file", fpath)
+                                print(f"{SLATE}{file_contents[:2000]}{C_RESET}\n")
+                            elif ext in (".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp"):
+                                print(f"{SLATE_DARK}↳ Image file in clipboard: {fpath}{C_RESET}")
+                                print(f"{SLATE}   Say \"describe this image\" and I will analyze it.{C_RESET}\n")
             else:
                 full_tokens = []
                 try:
@@ -314,6 +349,8 @@ def run_chat_cli(
                     full_text = "".join(full_tokens).strip()
                     if model.memory and len(full_text.split()) > 8:
                         model.memory.add_insight(f"Q: {user_input[:50]} -> A: {full_text[:70]}")
+                    session_history.append(("Lunaite", full_text))
+
                 except Exception:
                     response = model.generate(user_input, use_deliberation=False, use_agent=False)
                     print(f"{response}\n")
