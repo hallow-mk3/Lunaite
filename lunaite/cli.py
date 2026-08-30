@@ -253,7 +253,8 @@ def run_chat_cli(
             print(f"\n{CYAN_MAIN}{C_BOLD}● Lunaite{C_RESET}")
 
             # Execution with tool awareness and deliberation callbacks
-            intent = model.agent.decide_tool(user_input, lambda p: model._raw_generate(p)) if model.agent else None
+            memory_ctx = model.memory.get_context_summary() if model.memory else ""
+            intent = model.agent.decide_tool(user_input, lambda p: model._raw_generate(p), context=memory_ctx) if model.agent else None
 
             if deliberate and model.cognitive:
                 response = model.cognitive.deliberate(

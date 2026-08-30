@@ -60,6 +60,23 @@ def get_current_time_str(location: str = "") -> str:
     return f"Current System Time: {time.strftime('%Y-%m-%d %I:%M:%S %p (%A %Z)', local_t)} (UTC: {time.strftime('%Y-%m-%d %H:%M:%S UTC', now_utc)})"
 
 
+def _extract_recent_topic(context: str) -> str:
+    """Extract key entity or topic from recent conversation memory context."""
+    if not context:
+        return ""
+    # Extract topics from Q: ... -> A: ... entries in memory
+    lines = context.strip().split("\n")
+    for line in reversed(lines):
+        if "Q:" in line:
+            q_part = line.split("Q:")[1].split("->")[0].strip()
+            # Clean prompt artifacts
+            clean = re.sub(r'^(?:when\s+was|who\s+is|what\s+is|where\s+is|tell\s+me\s+about|at\s+what\s+time\s+did)\s+', '', q_part, flags=re.IGNORECASE)
+            clean = re.sub(r'\s+(?:launched|released|created|built|born|happen|price)\??$', '', clean, flags=re.IGNORECASE).strip("?.! ")
+            if len(clean) > 3:
+                return clean
+    return ""
+
+
 class LunaiteAgent:
     """
     Autonomous tool detection and execution engine for Lunaite Architecture.
@@ -68,10 +85,15 @@ class LunaiteAgent:
     def __init__(self, config: Optional[AgentConfig] = None):
         self.config = config or AgentConfig()
 
-    def decide_tool(self, prompt: str, generate_fn: Optional[Callable[[str], str]] = None) -> Optional[Tuple[str, str]]:
+    def decide_tool(
+        self,
+        prompt: str,
+        generate_fn: Optional[Callable[[str], str]] = None,
+        context: str = ""
+    ) -> Optional[Tuple[str, str]]:
         """
         Dynamically determine if a tool is needed using fast heuristic pattern matching
-        with fallback to LLM tool deliberation.
+        with contextual resolution and fallback to LLM tool deliberation.
         """
         prompt_lower = prompt.lower().strip()
 
@@ -113,8 +135,12 @@ class LunaiteAgent:
         if any(k in prompt_lower for k in ["read clipboard", "clipboard content"]):
             return ("clipboard_read", "")
 
-        # 8. Web Search Heuristics — Comprehensive Real-Time & Fact Verification Triggers
-        # Triggers on questions about real-world entities, launches, news, dates, events, releases, schedules, prices
+        # 8. Conversational greetings to skip
+        conversational_greetings = ["hi", "hello", "hey", "how are you", "what's up", "who are you", "thank you", "thanks"]
+        if prompt_lower in conversational_greetings:
+            return None
+
+        # 9. Web Search Heuristics — Comprehensive Real-Time & Fact Verification Triggers
         search_triggers = [
             "latest", "recent", "news", "current", "when is", "when did", "when will",
             "at what time", "what time did", "launch", "launched", "launching",
@@ -123,25 +149,31 @@ class LunaiteAgent:
             "upcoming", "schedule", "today", "yesterday", "tomorrow", "this year",
             "who is", "who was", "where is", "how much is", "what happened to", "status of",
             "update on", "news on", "tell me about", "search the web", "search for",
-            "google", "look up", "find out", "real time", "real-time", "live"
+            "google", "look up", "find out", "real time", "real-time", "live", "lead to", "lead of",
+            "who directed", "who built", "who created", "who designed"
         ]
 
-        # Ignore purely conversational greetings from searching
-        conversational_greetings = ["hi", "hello", "hey", "how are you", "what's up", "who are you", "thank you", "thanks"]
-        if prompt_lower in conversational_greetings:
-            return None
+        # Context-aware pronoun expansion for follow-up questions
+        pronoun_triggers = ["it", "this", "that", "them", "to it", "of it", "for it"]
+        has_pronoun = any(re.search(rf'\b{re.escape(p)}\b', prompt_lower) for p in pronoun_triggers)
+        recent_topic = _extract_recent_topic(context)
 
-        if self.config.auto_web_search and any(trig in prompt_lower for trig in search_triggers):
+        if self.config.auto_web_search and (any(trig in prompt_lower for trig in search_triggers) or (has_pronoun and recent_topic)):
             clean_q = re.sub(
                 r'^(?:search\s+for|search\s+the\s+web\s+for|google|look\s+up|find\s+out\s+about|can\s+you\s+check|can\s+you\s+search\s+for)\s+',
                 '', prompt, flags=re.IGNORECASE
             ).strip("?.! ")
+
+            # Enrich query with previous topic if referring to "it/this/that"
+            if has_pronoun and recent_topic and recent_topic.lower() not in clean_q.lower():
+                clean_q = f"{recent_topic} {clean_q}"
+
             return ("web_search", clean_q if clean_q else prompt)
 
-        # 9. LLM-Driven Autonomous Tool Decision (for arbitrary complex queries)
+        # 10. LLM-Driven Autonomous Tool Decision (for arbitrary complex queries)
         if generate_fn and self.config.auto_web_search and len(prompt.split()) > 2:
             try:
-                decide_prompt = f"{TOOL_SYSTEM_PROMPT}\nUser Query: {prompt}\nJSON Decision:"
+                decide_prompt = f"{TOOL_SYSTEM_PROMPT}\nRecent Context: {context[:300]}\nUser Query: {prompt}\nJSON Decision:"
                 raw_decision = generate_fn(decide_prompt).strip()
                 json_match = re.search(r'\{.*\}', raw_decision, re.DOTALL)
                 if json_match:
@@ -151,6 +183,8 @@ class LunaiteAgent:
                     if tool and tool != "none":
                         if tool == "get_current_time":
                             return ("time", arg)
+                        if tool == "web_search" and has_pronoun and recent_topic and recent_topic.lower() not in arg.lower():
+                            arg = f"{recent_topic} {arg}"
                         return (tool, arg if arg else prompt)
             except Exception:
                 pass
