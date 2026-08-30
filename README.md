@@ -208,12 +208,18 @@ Interact directly from your terminal:
 ```bash
 # Terminal chat with any model
 lunaite run qwen2.5:7b
+# or via python module directly:
+python -m lunaite.cli run qwen2.5:7b
 
 # Terminal chat with deep deliberation
 lunaite run llama3.1:8b --deliberate
+# or:
+python -m lunaite.cli run llama3.1:8b --deliberate
 
 # View hardware stats and diagnostics
 lunaite info
+# or:
+python -m lunaite.cli info
 ```
 
 ---
