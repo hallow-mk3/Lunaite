@@ -55,3 +55,7 @@ Prompt.md
 prompt.md
 [Pp]rompt.md
 
+# Runtime-generated data (memory, screenshots, eval results)
+lunaite_memory.json
+data/
+research/tool_selection/results/
