@@ -19,23 +19,40 @@ from typing import Dict, Any, List, Optional
 
 
 def web_search(query: str, max_results: int = 5) -> str:
-    """Perform live web search via DuckDuckGo and return ranked snippets."""
+    """Perform live web search and return ranked factual snippets with URL citations."""
+    clean_query = query.strip()
+    results = []
+
+    # 1. DuckDuckGo Instant Answer API (fast, clean structured facts)
     try:
-        encoded = urllib.parse.quote(query)
+        ia_url = f"https://api.duckduckgo.com/?q={urllib.parse.quote(clean_query)}&format=json&no_html=1&skip_disambig=1"
+        req = urllib.request.Request(ia_url, headers={"User-Agent": "Lunaite/3.0"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            abstract = data.get("AbstractText", "")
+            heading = data.get("Heading", "")
+            source_url = data.get("AbstractURL", "")
+            if abstract:
+                results.append(f"[Instant Answer: {heading}]\nURL: {source_url}\n{abstract}")
+    except Exception:
+        pass
+
+    # 2. DuckDuckGo Live HTML Search (real-time news and full web results)
+    try:
+        encoded = urllib.parse.quote(clean_query)
         url = f"https://html.duckduckgo.com/html/?q={encoded}"
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
             "Accept-Language": "en-US,en;q=0.9"
         }
         req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=8) as resp:
             html = resp.read().decode("utf-8", errors="replace")
 
         snippets = re.findall(r'<a class="result__snippet[^>]*>(.*?)</a>', html, re.DOTALL)
         titles = re.findall(r'<h2 class="result__title">.*?<a[^>]*>(.*?)</a>', html, re.DOTALL)
         urls = re.findall(r'<a class="result__url"[^>]*href="([^"]*)"', html, re.DOTALL)
 
-        results = []
         for i in range(min(len(snippets), max_results)):
             clean_snippet = re.sub(r'<.*?>', '', snippets[i]).strip()
             clean_title = re.sub(r'<.*?>', '', titles[i]).strip() if i < len(titles) else f"Result {i+1}"
@@ -46,20 +63,26 @@ def web_search(query: str, max_results: int = 5) -> str:
                 if m:
                     raw_url = urllib.parse.unquote(m.group(1))
 
-            if clean_snippet:
-                results.append(f"[{i+1}] {clean_title}\n    URL: {raw_url}\n    Snippet: {clean_snippet}")
+            if clean_snippet and clean_snippet not in [r for r in results]:
+                results.append(f"[{len(results)+1}] {clean_title}\n    URL: {raw_url}\n    Snippet: {clean_snippet}")
 
-        if results:
-            return "\n\n".join(results)
-
-        # Fallback to Wikipedia
-        wiki_res = wiki_lookup(query)
-        if wiki_res and "No Wikipedia extract" not in wiki_res:
-            return f"[Web Search Fallback Knowledge]:\n{wiki_res}"
-
-        return f"Searched the web for '{query}'. No direct web results found."
     except Exception as e:
-        return f"[Web Search Error]: {e}"
+        if not results:
+            results.append(f"[Live Web Search Notice]: Search query executed for '{clean_query}' ({e})")
+
+    # 3. Wikipedia Fallback Lookup if search results are sparse
+    if len(results) < 2:
+        try:
+            wiki_res = wiki_lookup(clean_query)
+            if wiki_res and "No Wikipedia extract" not in wiki_res:
+                results.append(f"\n[Wikipedia Background]:\n{wiki_res}")
+        except Exception:
+            pass
+
+    if results:
+        return "\n\n".join(results)
+
+    return f"Searched the web for '{clean_query}'. No direct results found."
 
 
 def fetch_url(url: str, max_chars: int = 4000) -> str:
@@ -75,7 +98,6 @@ def fetch_url(url: str, max_chars: int = 4000) -> str:
         with urllib.request.urlopen(req, timeout=10) as resp:
             html = resp.read().decode("utf-8", errors="replace")
 
-        # Strip scripts, styles, header, footer, nav
         html = re.sub(r'<script.*?</script>', '', html, flags=re.DOTALL | re.IGNORECASE)
         html = re.sub(r'<style.*?</style>', '', html, flags=re.DOTALL | re.IGNORECASE)
         html = re.sub(r'<nav.*?</nav>', '', html, flags=re.DOTALL | re.IGNORECASE)
@@ -96,7 +118,8 @@ def fetch_url(url: str, max_chars: int = 4000) -> str:
 def wiki_lookup(topic: str) -> str:
     """Fetch structured summary from Wikipedia REST API."""
     try:
-        encoded = urllib.parse.quote(topic)
+        clean_topic = re.sub(r'^(?:who\s+was|who\s+is|what\s+is|tell\s+me\s+about)\s+', '', topic, flags=re.IGNORECASE).strip("?.! ")
+        encoded = urllib.parse.quote(clean_topic)
         url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{encoded}"
         headers = {"User-Agent": "LunaiteAI-Architecture/3.0 (Swasthik Shetty)"}
         req = urllib.request.Request(url, headers=headers)
@@ -156,17 +179,6 @@ def fetch_weather(location: str = "London") -> str:
                 f"• Temperature: {temp_c}°C ({temp_f}°F)\n"
                 f"• Wind Speed: {wind_km} km/h"
             )
-    except Exception:
-        pass
-
-    # Fallback to wttr.in
-    try:
-        url = f"https://wttr.in/{urllib.parse.quote(loc)}?format=3"
-        req = urllib.request.Request(url, headers={"User-Agent": "curl/7.68.0"})
-        with urllib.request.urlopen(req, timeout=6) as resp:
-            text = resp.read().decode("utf-8", errors="replace").strip()
-            if text and "500" not in text:
-                return f"**Live Weather for {loc}:**\n{text}"
     except Exception:
         pass
 

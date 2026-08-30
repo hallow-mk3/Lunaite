@@ -1,7 +1,7 @@
 """
 Lunaite Architecture — Universal Agent & Tool Orchestration Suite
 =================================================================
-Orchestrates autonomous intent detection, web search, system telemetry,
+Orchestrates autonomous intent detection, live web search, system telemetry,
 and desktop execution with downstream neural models.
 
 Author: Swasthik Shetty <swasthik.mk3@gmail.com>
@@ -9,6 +9,8 @@ License: MIT
 """
 
 import re
+import time
+import json
 from typing import Dict, Any, List, Optional, Tuple, Callable
 from ..config import AgentConfig
 from .tools import web_search, fetch_url, wiki_lookup, fetch_weather
@@ -37,7 +39,7 @@ Available Tools:
 - powershell(command): Execute a terminal / shell command and return stdout/stderr.
 - screenshot(): Capture a display screenshot.
 - telemetry(): Get current CPU, RAM, GPU, and Disk stats.
-- none: If the question can be answered purely from conversation, mathematics, general knowledge, or coding logic.
+- none: If the question is a purely creative greeting, mathematics calculation, code snippet, or conversational banter.
 
 Decision Rule:
 Output strictly JSON in this exact schema without any extra commentary:
@@ -50,7 +52,6 @@ def get_current_time_str(location: str = "") -> str:
     loc_clean = location.strip().lower()
     now_utc = time.gmtime()
     if "india" in loc_clean or "ist" in loc_clean:
-        # UTC+5:30
         ist_timestamp = time.time() + 5.5 * 3600
         ist_struct = time.gmtime(ist_timestamp)
         return f"Current Time in India (IST, UTC+5:30): {time.strftime('%Y-%m-%d %I:%M:%S %p (%A)', ist_struct)}"
@@ -112,23 +113,36 @@ class LunaiteAgent:
         if any(k in prompt_lower for k in ["read clipboard", "clipboard content"]):
             return ("clipboard_read", "")
 
-        # 8. Web Search Heuristics (news, current events, recent developments, schedules, launches)
+        # 8. Web Search Heuristics — Comprehensive Real-Time & Fact Verification Triggers
+        # Triggers on questions about real-world entities, launches, news, dates, events, releases, schedules, prices
         search_triggers = [
-            "latest", "recent", "news", "current", "when is", "what is the price",
-            "upcoming", "launching", "schedule", "who won", "score", "today",
-            "search the web", "search for", "google", "look up"
+            "latest", "recent", "news", "current", "when is", "when did", "when will",
+            "at what time", "what time did", "launch", "launched", "launching",
+            "rocket", "telescope", "satellite", "spacecraft", "mission", "nasa", "spacex",
+            "release date", "released", "price of", "stock price", "who won", "score",
+            "upcoming", "schedule", "today", "yesterday", "tomorrow", "this year",
+            "who is", "who was", "where is", "how much is", "what happened to", "status of",
+            "update on", "news on", "tell me about", "search the web", "search for",
+            "google", "look up", "find out", "real time", "real-time", "live"
         ]
+
+        # Ignore purely conversational greetings from searching
+        conversational_greetings = ["hi", "hello", "hey", "how are you", "what's up", "who are you", "thank you", "thanks"]
+        if prompt_lower in conversational_greetings:
+            return None
+
         if self.config.auto_web_search and any(trig in prompt_lower for trig in search_triggers):
-            # Clean search query
-            clean_q = re.sub(r'^(?:search\s+for|search\s+the\s+web\s+for|google|look\s+up|what\s+is\s+the\s+|when\s+is\s+the\s+|who\s+is\s+the\s+)', '', prompt, flags=re.IGNORECASE).strip("?.! ")
+            clean_q = re.sub(
+                r'^(?:search\s+for|search\s+the\s+web\s+for|google|look\s+up|find\s+out\s+about|can\s+you\s+check|can\s+you\s+search\s+for)\s+',
+                '', prompt, flags=re.IGNORECASE
+            ).strip("?.! ")
             return ("web_search", clean_q if clean_q else prompt)
 
-        # 9. LLM-Driven Autonomous Tool Decision (when uncertain and generate_fn provided)
-        if generate_fn and self.config.auto_web_search:
+        # 9. LLM-Driven Autonomous Tool Decision (for arbitrary complex queries)
+        if generate_fn and self.config.auto_web_search and len(prompt.split()) > 2:
             try:
                 decide_prompt = f"{TOOL_SYSTEM_PROMPT}\nUser Query: {prompt}\nJSON Decision:"
                 raw_decision = generate_fn(decide_prompt).strip()
-                # Parse JSON block
                 json_match = re.search(r'\{.*\}', raw_decision, re.DOTALL)
                 if json_match:
                     data = json.loads(json_match.group(0))
