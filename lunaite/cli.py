@@ -280,9 +280,12 @@ def run_chat_cli(
                     f"[Tool Execution Result — {intent[0].upper()}]:\n"
                     f"{tool_output}\n\n"
                     f"User Query: {user_input}\n\n"
+                    f"Context: You are Lunaite, a local AI agent running directly on the user's machine with full access to their local file system, clipboard, and system tools.\n"
                     f"IMPORTANT: Answer ONLY using the tool results above. "
+                    f"Do NOT claim you cannot access local files or the clipboard — you can. "
                     f"Do NOT invent names, organizations, or facts not present in the results. "
-                    f"If the specific answer is not in the results, say so clearly and suggest the user check an official source."
+                    f"If the clipboard or file contains a path, acknowledge what it is and offer to read it. "
+                    f"If the specific fact is not in the results, say so and suggest an official source."
                 )
 
                 full_tokens = []

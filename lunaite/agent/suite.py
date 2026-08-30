@@ -132,7 +132,11 @@ class LunaiteAgent:
             return ("telemetry", "")
         if any(k in prompt_lower for k in ["take a screenshot", "capture screen"]):
             return ("screenshot", "")
-        if any(k in prompt_lower for k in ["read clipboard", "clipboard content"]):
+        if any(k in prompt_lower for k in [
+            "read clipboard", "clipboard content", "clipboard", "what's in clipboard",
+            "whats in clipboard", "what is in clipboard", "what's copied", "check clipboard",
+            "show clipboard", "paste", "what did i copy"
+        ]):
             return ("clipboard_read", "")
 
         # 8. Conversational greetings to skip
