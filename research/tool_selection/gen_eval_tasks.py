@@ -1,0 +1,160 @@
+import json, sys
+
+# ~130 ground-truth tasks for the tool-selection study.
+# Fields:
+#   id          - unique task identifier
+#   query       - natural-language user request
+#   correct_tool - expected tool name (null = no tool should be called)
+#   correct_args - expected arguments dict (null = no tool)
+#   case_type   - "unambiguous" | "ambiguous" | "no_tool"
+#   note        - brief description of what makes this case interesting
+
+tasks = [
+    # ─────────────────────── MATH & ARITHMETIC ──────────────────────────── #
+    # Unambiguous
+    {"id":"m01","query":"What is 47 plus 83?","correct_tool":"add_numbers","correct_args":{"a":47,"b":83},"case_type":"unambiguous","note":"plain addition"},
+    {"id":"m02","query":"Calculate the sum of 1000 and 2500.","correct_tool":"add_numbers","correct_args":{"a":1000,"b":2500},"case_type":"unambiguous","note":"add with large numbers"},
+    {"id":"m03","query":"What is 200 minus 78?","correct_tool":"subtract_numbers","correct_args":{"a":200,"b":78},"case_type":"unambiguous","note":"subtraction"},
+    {"id":"m04","query":"Subtract 15 from 100.","correct_tool":"subtract_numbers","correct_args":{"a":100,"b":15},"case_type":"unambiguous","note":"subtraction explicit order"},
+    {"id":"m05","query":"What is 6 times 7?","correct_tool":"multiply_numbers","correct_args":{"a":6,"b":7},"case_type":"unambiguous","note":"multiplication"},
+    {"id":"m06","query":"Multiply 123 by 456.","correct_tool":"multiply_numbers","correct_args":{"a":123,"b":456},"case_type":"unambiguous","note":"multiplication large"},
+    {"id":"m07","query":"What is 144 divided by 12?","correct_tool":"divide_numbers","correct_args":{"a":144,"b":12},"case_type":"unambiguous","note":"division"},
+    {"id":"m08","query":"Divide 500 by 4.","correct_tool":"divide_numbers","correct_args":{"a":500,"b":4},"case_type":"unambiguous","note":"division exact"},
+    {"id":"m09","query":"What is 2 to the power of 10?","correct_tool":"raise_to_power","correct_args":{"base":2,"exponent":10},"case_type":"unambiguous","note":"exponentiation"},
+    {"id":"m10","query":"Raise 5 to the power of 3.","correct_tool":"raise_to_power","correct_args":{"base":5,"exponent":3},"case_type":"unambiguous","note":"cube"},
+    # Ambiguous (vs other numeric tools)
+    {"id":"m11","query":"What is 9.8 squared?","correct_tool":"raise_to_power","correct_args":{"base":9.8,"exponent":2},"case_type":"ambiguous","note":"'squared' could tempt multiply"},
+    {"id":"m12","query":"How much is 37 more than 63?","correct_tool":"add_numbers","correct_args":{"a":37,"b":63},"case_type":"ambiguous","note":"'more than' could confuse direction"},
+
+    # ─────────────────────── LENGTH CONVERSION ──────────────────────────── #
+    {"id":"l01","query":"How many miles is 10 kilometres?","correct_tool":"convert_km_to_miles","correct_args":{"km":10},"case_type":"unambiguous","note":"km to miles"},
+    {"id":"l02","query":"Convert 26.2 miles to kilometres.","correct_tool":"convert_miles_to_km","correct_args":{"miles":26.2},"case_type":"unambiguous","note":"miles to km (marathon)"},
+    {"id":"l03","query":"Convert 180 centimetres to inches.","correct_tool":"convert_inches_to_cm","correct_args":{"inches":70.866},"case_type":"ambiguous","note":"inverse direction — tricky phrasing; correct tool is still convert_inches_to_cm but query says cm→in which would be a different (missing) tool; marking ambiguous"},
+    {"id":"l03b","query":"How many centimetres is 6 feet?","correct_tool":"convert_feet_to_meters","correct_args":{"feet":6},"case_type":"ambiguous","note":"feet→cm requires two steps; best single tool is feet→meters"},
+    {"id":"l04","query":"How many feet is 2 metres?","correct_tool":"convert_meters_to_feet","correct_args":{"meters":2},"case_type":"unambiguous","note":"meters to feet"},
+    {"id":"l05","query":"Convert 5 feet to metres.","correct_tool":"convert_feet_to_meters","correct_args":{"feet":5},"case_type":"unambiguous","note":"feet to meters"},
+    {"id":"l06","query":"How many inches is 30 centimetres?","correct_tool":"convert_inches_to_cm","correct_args":{"inches":11.811},"case_type":"ambiguous","note":"inverse; no direct cm→in tool"},
+    {"id":"l07","query":"Convert 100 km to miles.","correct_tool":"convert_km_to_miles","correct_args":{"km":100},"case_type":"unambiguous","note":"standard km to miles"},
+
+    # ─────────────────────── WEIGHT CONVERSION ──────────────────────────── #
+    {"id":"w01","query":"How many pounds is 70 kilograms?","correct_tool":"convert_kg_to_lbs","correct_args":{"kg":70},"case_type":"unambiguous","note":"kg to lbs"},
+    {"id":"w02","query":"Convert 150 pounds to kilograms.","correct_tool":"convert_lbs_to_kg","correct_args":{"lbs":150},"case_type":"unambiguous","note":"lbs to kg"},
+    {"id":"w03","query":"How many ounces is 500 grams?","correct_tool":"convert_grams_to_ounces","correct_args":{"grams":500},"case_type":"unambiguous","note":"grams to ounces"},
+    {"id":"w04","query":"Convert 16 ounces to grams.","correct_tool":"convert_ounces_to_grams","correct_args":{"ounces":16},"case_type":"unambiguous","note":"ounces to grams"},
+    {"id":"w05","query":"How many kilograms is 2.5 metric tonnes?","correct_tool":"convert_tonnes_to_kg","correct_args":{"tonnes":2.5},"case_type":"unambiguous","note":"tonnes to kg"},
+    # Confusable with length
+    {"id":"w06","query":"Convert 5 kg to lbs.","correct_tool":"convert_kg_to_lbs","correct_args":{"kg":5},"case_type":"ambiguous","note":"short form — could retrieve length tools"},
+    {"id":"w07","query":"I weigh 80 kilograms. What is that in pounds?","correct_tool":"convert_kg_to_lbs","correct_args":{"kg":80},"case_type":"ambiguous","note":"weight context should disambiguate from length"},
+
+    # ─────────────────────── TEMPERATURE ────────────────────────────────── #
+    {"id":"t01","query":"What is 100 degrees Celsius in Fahrenheit?","correct_tool":"celsius_to_fahrenheit","correct_args":{"celsius":100},"case_type":"unambiguous","note":"boiling point"},
+    {"id":"t02","query":"Convert 98.6 degrees Fahrenheit to Celsius.","correct_tool":"fahrenheit_to_celsius","correct_args":{"fahrenheit":98.6},"case_type":"unambiguous","note":"body temperature"},
+    {"id":"t03","query":"What is 0 Celsius in Kelvin?","correct_tool":"celsius_to_kelvin","correct_args":{"celsius":0},"case_type":"unambiguous","note":"freezing point to Kelvin"},
+    {"id":"t04","query":"Convert 300 Kelvin to Celsius.","correct_tool":"kelvin_to_celsius","correct_args":{"kelvin":300},"case_type":"unambiguous","note":"K to C"},
+    {"id":"t05","query":"What is 32 Fahrenheit in Kelvin?","correct_tool":"fahrenheit_to_kelvin","correct_args":{"fahrenheit":32},"case_type":"unambiguous","note":"F to K"},
+    # Confusable pairs
+    {"id":"t06","query":"Convert -40 to the other temperature scale.","correct_tool":None,"correct_args":None,"case_type":"no_tool","note":"-40 is same in both C and F; ambiguous which conversion; no single tool is correct"},
+    {"id":"t07","query":"Is 37 Celsius hot?","correct_tool":None,"correct_args":None,"case_type":"no_tool","note":"judgment question; no tool needed"},
+
+    # ─────────────────────── DATE & TIME ────────────────────────────────── #
+    {"id":"d01","query":"How many days between 2024-01-01 and 2024-12-31?","correct_tool":"days_between_dates","correct_args":{"date1":"2024-01-01","date2":"2024-12-31"},"case_type":"unambiguous","note":"days in a year"},
+    {"id":"d02","query":"What date is 30 days after 2024-03-15?","correct_tool":"add_days_to_date","correct_args":{"date":"2024-03-15","days":30},"case_type":"unambiguous","note":"future date"},
+    {"id":"d03","query":"What day of the week was 2024-07-04?","correct_tool":"get_day_of_week","correct_args":{"date":"2024-07-04"},"case_type":"unambiguous","note":"day of week"},
+    {"id":"d04","query":"Is 2024 a leap year?","correct_tool":"is_leap_year","correct_args":{"year":2024},"case_type":"unambiguous","note":"leap year check"},
+    {"id":"d05","query":"What ISO week number is 2024-06-15?","correct_tool":"get_iso_week_number","correct_args":{"date":"2024-06-15"},"case_type":"unambiguous","note":"ISO week"},
+    {"id":"d06","query":"How many days ago was 2020-01-01 from 2024-01-01?","correct_tool":"days_between_dates","correct_args":{"date1":"2020-01-01","date2":"2024-01-01"},"case_type":"unambiguous","note":"days between past dates"},
+    {"id":"d07","query":"What date is 100 days before 2025-01-01?","correct_tool":"add_days_to_date","correct_args":{"date":"2025-01-01","days":-100},"case_type":"ambiguous","note":"negative days — model must use negative value"},
+
+    # ─────────────────────── CURRENCY ───────────────────────────────────── #
+    {"id":"c01","query":"Convert 100 USD to EUR.","correct_tool":"convert_currency","correct_args":{"amount":100,"from_currency":"USD","to_currency":"EUR"},"case_type":"unambiguous","note":"generic converter"},
+    {"id":"c02","query":"How many euros is 50 dollars?","correct_tool":"convert_usd_to_eur","correct_args":{"amount":50},"case_type":"ambiguous","note":"specific USD→EUR tool vs generic — both correct but specific is preferred"},
+    {"id":"c03","query":"Convert 200 EUR to USD.","correct_tool":"convert_eur_to_usd","correct_args":{"amount":200},"case_type":"ambiguous","note":"specific EUR→USD tool"},
+    {"id":"c04","query":"What is the exchange rate from GBP to JPY?","correct_tool":"get_exchange_rate","correct_args":{"from_currency":"GBP","to_currency":"JPY"},"case_type":"unambiguous","note":"rate query"},
+    {"id":"c05","query":"What currencies can I convert?","correct_tool":"list_supported_currencies","correct_args":{},"case_type":"unambiguous","note":"list currencies"},
+    {"id":"c06","query":"How much is 1000 Indian Rupees in Canadian Dollars?","correct_tool":"convert_currency","correct_args":{"amount":1000,"from_currency":"INR","to_currency":"CAD"},"case_type":"unambiguous","note":"non-common pair"},
+    {"id":"c07","query":"What is the USD to CHF rate?","correct_tool":"get_exchange_rate","correct_args":{"from_currency":"USD","to_currency":"CHF"},"case_type":"unambiguous","note":"rate query"},
+
+    # ─────────────────────── STRING ─────────────────────────────────────── #
+    {"id":"s01","query":"How many words are in 'The quick brown fox jumps over the lazy dog'?","correct_tool":"word_count","correct_args":{"text":"The quick brown fox jumps over the lazy dog"},"case_type":"unambiguous","note":"word count"},
+    {"id":"s02","query":"How many characters does the word 'Supercalifragilistic' have?","correct_tool":"character_count","correct_args":{"text":"Supercalifragilistic"},"case_type":"ambiguous","note":"character vs word count — query says characters"},
+    {"id":"s03","query":"Reverse the string 'hello'.","correct_tool":"reverse_string","correct_args":{"text":"hello"},"case_type":"unambiguous","note":"string reversal"},
+    {"id":"s04","query":"Convert 'machine learning' to uppercase.","correct_tool":"to_uppercase","correct_args":{"text":"machine learning"},"case_type":"unambiguous","note":"uppercase"},
+    {"id":"s05","query":"How many vowels are in 'astronaut'?","correct_tool":"count_vowels","correct_args":{"text":"astronaut"},"case_type":"unambiguous","note":"vowel count"},
+    {"id":"s06","query":"Count the letters in 'elephant'.","correct_tool":"character_count","correct_args":{"text":"elephant"},"case_type":"ambiguous","note":"'letters' could mean character_count or word_count"},
+    {"id":"s07","query":"What is 'Python' spelled backwards?","correct_tool":"reverse_string","correct_args":{"text":"Python"},"case_type":"unambiguous","note":"reverse string"},
+
+    # ─────────────────────── STATISTICS ─────────────────────────────────── #
+    {"id":"st01","query":"What is the average of 10, 20, 30, 40, 50?","correct_tool":"calculate_mean","correct_args":{"numbers":[10,20,30,40,50]},"case_type":"unambiguous","note":"mean/average"},
+    {"id":"st02","query":"Find the median of the list [3, 1, 4, 1, 5, 9, 2, 6].","correct_tool":"calculate_median","correct_args":{"numbers":[3,1,4,1,5,9,2,6]},"case_type":"unambiguous","note":"median"},
+    {"id":"st03","query":"Calculate the standard deviation of [2, 4, 4, 4, 5, 5, 7, 9].","correct_tool":"calculate_standard_deviation","correct_args":{"numbers":[2,4,4,4,5,5,7,9]},"case_type":"unambiguous","note":"stdev"},
+    {"id":"st04","query":"What is the largest number in [15, 3, 9, 27, 6]?","correct_tool":"find_maximum","correct_args":{"numbers":[15,3,9,27,6]},"case_type":"unambiguous","note":"max"},
+    {"id":"st05","query":"What is the smallest number in [15, 3, 9, 27, 6]?","correct_tool":"find_minimum","correct_args":{"numbers":[15,3,9,27,6]},"case_type":"unambiguous","note":"min"},
+    {"id":"st06","query":"What is the mean of [100]?","correct_tool":"calculate_mean","correct_args":{"numbers":[100]},"case_type":"ambiguous","note":"single-element list — mean and median are same, model must pick mean"},
+    {"id":"st07","query":"Find the average score of [88, 92, 76, 95, 84].","correct_tool":"calculate_mean","correct_args":{"numbers":[88,92,76,95,84]},"case_type":"unambiguous","note":"mean (average)"},
+
+    # ─────────────────────── GEOGRAPHY ──────────────────────────────────── #
+    {"id":"g01","query":"What are the coordinates of Tokyo?","correct_tool":"geocode_city","correct_args":{"city":"Tokyo"},"case_type":"unambiguous","note":"geocoding"},
+    {"id":"g02","query":"What is the population of London?","correct_tool":"get_city_population","correct_args":{"city":"London"},"case_type":"ambiguous","note":"city vs country population — London is a city"},
+    {"id":"g03","query":"What is the population of France?","correct_tool":"get_country_population","correct_args":{"country":"France"},"case_type":"ambiguous","note":"country population"},
+    {"id":"g04","query":"What is the area of Australia in square kilometres?","correct_tool":"get_country_area","correct_args":{"country":"Australia"},"case_type":"unambiguous","note":"country area"},
+    {"id":"g05","query":"What is the capital of Germany?","correct_tool":"get_country_capital","correct_args":{"country":"Germany"},"case_type":"unambiguous","note":"capital city"},
+    {"id":"g06","query":"Where is Mumbai located (lat/lon)?","correct_tool":"geocode_city","correct_args":{"city":"Mumbai"},"case_type":"unambiguous","note":"geocode by lat/lon"},
+    {"id":"g07","query":"How many people live in New York City?","correct_tool":"get_city_population","correct_args":{"city":"New York"},"case_type":"ambiguous","note":"'New York City' vs 'New York' (state) — city tool is correct"},
+    {"id":"g08","query":"What is India's population?","correct_tool":"get_country_population","correct_args":{"country":"India"},"case_type":"unambiguous","note":"country population"},
+    {"id":"g09","query":"Which country is the largest by area?","correct_tool":None,"correct_args":None,"case_type":"no_tool","note":"comparative question; tool only returns one country at a time"},
+
+    # ─────────────────────── TRIVIA ─────────────────────────────────────── #
+    {"id":"tr01","query":"What is the atomic number of gold?","correct_tool":"get_element_info","correct_args":{"element_name":"gold"},"case_type":"unambiguous","note":"element atomic number"},
+    {"id":"tr02","query":"How many moons does Jupiter have?","correct_tool":"get_planet_moon_count","correct_args":{"planet":"Jupiter"},"case_type":"unambiguous","note":"planet moons"},
+    {"id":"tr03","query":"What is the diameter of Saturn?","correct_tool":"get_planet_diameter","correct_args":{"planet":"Saturn"},"case_type":"unambiguous","note":"planet diameter"},
+    {"id":"tr04","query":"What is the speed of light in water?","correct_tool":"get_speed_of_light_in_medium","correct_args":{"medium":"water"},"case_type":"unambiguous","note":"speed of light"},
+    {"id":"tr05","query":"At what temperature does ethanol boil?","correct_tool":"get_boiling_point","correct_args":{"substance":"ethanol"},"case_type":"unambiguous","note":"boiling point"},
+    {"id":"tr06","query":"What is the chemical symbol for iron?","correct_tool":"get_element_info","correct_args":{"element_name":"iron"},"case_type":"unambiguous","note":"chemical symbol"},
+    {"id":"tr07","query":"How many moons does Mars have?","correct_tool":"get_planet_moon_count","correct_args":{"planet":"Mars"},"case_type":"unambiguous","note":"Mars has 2 moons"},
+    {"id":"tr08","query":"What is the boiling point of water in Celsius?","correct_tool":"get_boiling_point","correct_args":{"substance":"water"},"case_type":"ambiguous","note":"could tempt celsius_to_fahrenheit; correct is boiling point lookup"},
+    {"id":"tr09","query":"What planet has the most moons?","correct_tool":None,"correct_args":None,"case_type":"no_tool","note":"comparative; tool only looks up one planet"},
+
+    # ─────────────────────── NO-TOOL CASES ──────────────────────────────── #
+    {"id":"n01","query":"What is the meaning of life?","correct_tool":None,"correct_args":None,"case_type":"no_tool","note":"philosophical; no tool fits"},
+    {"id":"n02","query":"Write me a haiku about the ocean.","correct_tool":None,"correct_args":None,"case_type":"no_tool","note":"creative writing"},
+    {"id":"n03","query":"Who won the 2022 FIFA World Cup?","correct_tool":None,"correct_args":None,"case_type":"no_tool","note":"sports trivia not in tool set"},
+    {"id":"n04","query":"Translate 'hello' to Spanish.","correct_tool":None,"correct_args":None,"case_type":"no_tool","note":"translation — no tool available"},
+    {"id":"n05","query":"Summarize the plot of Hamlet.","correct_tool":None,"correct_args":None,"case_type":"no_tool","note":"literary summary"},
+    {"id":"n06","query":"What is today's weather in Paris?","correct_tool":None,"correct_args":None,"case_type":"no_tool","note":"real-time weather; mocked tool not in 10-tool registry"},
+    {"id":"n07","query":"Tell me a joke.","correct_tool":None,"correct_args":None,"case_type":"no_tool","note":"generative; no tool"},
+    {"id":"n08","query":"What is the stock price of Apple?","correct_tool":None,"correct_args":None,"case_type":"no_tool","note":"real-time data; no tool"},
+    {"id":"n09","query":"Can you book a flight for me?","correct_tool":None,"correct_args":None,"case_type":"no_tool","note":"action-taking; outside read-only scope"},
+    {"id":"n10","query":"What is 2 + 2?","correct_tool":"add_numbers","correct_args":{"a":2,"b":2},"case_type":"unambiguous","note":"simplest possible; should always work"},
+
+    # ─────────────────────── EXTRA AMBIGUOUS / TRICK ────────────────────── #
+    {"id":"a01","query":"What is 5 km in miles?","correct_tool":"convert_km_to_miles","correct_args":{"km":5},"case_type":"unambiguous","note":"simple km to miles"},
+    {"id":"a02","query":"What is 5 kg in lbs?","correct_tool":"convert_kg_to_lbs","correct_args":{"kg":5},"case_type":"ambiguous","note":"kg vs km — single letter difference; tests retrieval discrimination"},
+    {"id":"a03","query":"What is the average of a list with only the number 42?","correct_tool":"calculate_mean","correct_args":{"numbers":[42]},"case_type":"unambiguous","note":"single element mean"},
+    {"id":"a04","query":"How do I convert 37°C to Fahrenheit?","correct_tool":"celsius_to_fahrenheit","correct_args":{"celsius":37},"case_type":"unambiguous","note":"body temperature C→F"},
+    {"id":"a05","query":"What is 37°F in Celsius?","correct_tool":"fahrenheit_to_celsius","correct_args":{"fahrenheit":37},"case_type":"ambiguous","note":"same number, different direction — must not confuse with a04"},
+    {"id":"a06","query":"What is the word count of an empty string?","correct_tool":"word_count","correct_args":{"text":""},"case_type":"unambiguous","note":"edge case: empty string"},
+    {"id":"a07","query":"Convert 0 km to miles.","correct_tool":"convert_km_to_miles","correct_args":{"km":0},"case_type":"unambiguous","note":"zero input"},
+    {"id":"a08","query":"What's bigger: 50 kg or 50 lbs?","correct_tool":None,"correct_args":None,"case_type":"no_tool","note":"comparison question; tools only convert, not compare"},
+    {"id":"a09","query":"Raise 0 to the power of 0.","correct_tool":"raise_to_power","correct_args":{"base":0,"exponent":0},"case_type":"unambiguous","note":"0^0 edge case"},
+    {"id":"a10","query":"What is the capital of a country that doesn't exist?","correct_tool":None,"correct_args":None,"case_type":"no_tool","note":"impossible lookup; model should not call tool"},
+    {"id":"a11","query":"Add the boiling point of water in Celsius to 0.","correct_tool":"add_numbers","correct_args":{"a":100,"b":0},"case_type":"ambiguous","note":"multi-step: should use add_numbers with 100+0; not boiling_point tool"},
+    {"id":"a12","query":"Is 2100 a leap year?","correct_tool":"is_leap_year","correct_args":{"year":2100},"case_type":"unambiguous","note":"century year — not a leap year"},
+    {"id":"a13","query":"How many characters does 'hello world' have including the space?","correct_tool":"character_count","correct_args":{"text":"hello world"},"case_type":"unambiguous","note":"character count with space"},
+    {"id":"a14","query":"Find the standard deviation of [5, 5, 5, 5].","correct_tool":"calculate_standard_deviation","correct_args":{"numbers":[5,5,5,5]},"case_type":"unambiguous","note":"stdev of constant list = 0"},
+    {"id":"a15","query":"What is the exchange rate from USD to USD?","correct_tool":"get_exchange_rate","correct_args":{"from_currency":"USD","to_currency":"USD"},"case_type":"ambiguous","note":"trivial rate = 1.0; valid call"},
+    {"id":"a16","query":"What is the latitude of Paris?","correct_tool":"geocode_city","correct_args":{"city":"Paris"},"case_type":"unambiguous","note":"lat/lon for Paris"},
+    {"id":"a17","query":"How many days until 2025-12-25 from 2025-01-01?","correct_tool":"days_between_dates","correct_args":{"date1":"2025-01-01","date2":"2025-12-25"},"case_type":"unambiguous","note":"days until Christmas"},
+    {"id":"a18","query":"Multiply the population of Tokyo by 2.","correct_tool":None,"correct_args":None,"case_type":"no_tool","note":"multi-step; population tool doesn't support multiplying"},
+    {"id":"a19","query":"What's heavier: a kilogram of iron or a kilogram of feathers?","correct_tool":None,"correct_args":None,"case_type":"no_tool","note":"trick question; same weight, no tool needed"},
+    {"id":"a20","query":"What is 1 divided by 0?","correct_tool":"divide_numbers","correct_args":{"a":1,"b":0},"case_type":"unambiguous","note":"tool will raise ValueError — execution error, but correct tool selection"},
+]
+
+if __name__ == "__main__":
+    for task in tasks:
+        print(json.dumps(task))
+    print(f"\nTotal: {len(tasks)} tasks", file=sys.stderr)
+    counts = {}
+    for t in tasks:
+        counts[t["case_type"]] = counts.get(t["case_type"], 0) + 1
+    for k, v in counts.items():
+        print(f"  {k}: {v}", file=sys.stderr)
