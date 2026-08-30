@@ -25,82 +25,133 @@ from .desktop import (
 )
 
 
+TOOL_SYSTEM_PROMPT = """You are Lunaite's Tool Orchestration Router.
+Analyze the user's input and decide if an external tool or real-time action is required.
+Available Tools:
+- web_search(query): Real-time web search for recent events, news, current facts, launches, future schedules, stock prices, external info.
+- get_current_time(location): Look up current time, timezone, or date.
+- weather(location): Real-time weather forecast for any city or region.
+- wiki(topic): Detailed encyclopedia/biography/historical knowledge.
+- read_file(path): Inspect content of a local file.
+- write_file(path, content): Create or overwrite a local file.
+- powershell(command): Execute a terminal / shell command and return stdout/stderr.
+- screenshot(): Capture a display screenshot.
+- telemetry(): Get current CPU, RAM, GPU, and Disk stats.
+- none: If the question can be answered purely from conversation, mathematics, general knowledge, or coding logic.
+
+Decision Rule:
+Output strictly JSON in this exact schema without any extra commentary:
+{"tool": "web_search" | "get_current_time" | "weather" | "wiki" | "read_file" | "write_file" | "powershell" | "screenshot" | "telemetry" | "none", "arg": "<argument string or empty>"}
+"""
+
+
+def get_current_time_str(location: str = "") -> str:
+    """Return formatted current time and date."""
+    loc_clean = location.strip().lower()
+    now_utc = time.gmtime()
+    if "india" in loc_clean or "ist" in loc_clean:
+        # UTC+5:30
+        ist_timestamp = time.time() + 5.5 * 3600
+        ist_struct = time.gmtime(ist_timestamp)
+        return f"Current Time in India (IST, UTC+5:30): {time.strftime('%Y-%m-%d %I:%M:%S %p (%A)', ist_struct)}"
+    
+    local_t = time.localtime()
+    return f"Current System Time: {time.strftime('%Y-%m-%d %I:%M:%S %p (%A %Z)', local_t)} (UTC: {time.strftime('%Y-%m-%d %H:%M:%S UTC', now_utc)})"
+
+
 class LunaiteAgent:
     """
     Autonomous tool detection and execution engine for Lunaite Architecture.
+    Combines rapid heuristic routing with LLM-driven autonomous tool decisions.
     """
     def __init__(self, config: Optional[AgentConfig] = None):
         self.config = config or AgentConfig()
 
-    def detect_intent(self, prompt: str) -> Optional[Tuple[str, str]]:
+    def decide_tool(self, prompt: str, generate_fn: Optional[Callable[[str], str]] = None) -> Optional[Tuple[str, str]]:
         """
-        Analyze user query to detect if a live tool or system action is needed.
-        Returns:
-            (tool_name, argument) or None
+        Dynamically determine if a tool is needed using fast heuristic pattern matching
+        with fallback to LLM tool deliberation.
         """
         prompt_lower = prompt.lower().strip()
 
-        # 1. URL fetch
+        # 1. Direct Time / Date Queries
+        if any(k in prompt_lower for k in ["time in ", "current time", "what time is it", "today's date", "time right now"]):
+            loc = re.split(r'time (?:in|for|at|of) ', prompt, flags=re.IGNORECASE)[-1].strip("?.! ")
+            return ("time", loc if loc else "")
+
+        # 2. Direct Weather
+        if any(w in prompt_lower for w in ["weather in ", "weather for ", "weather of ", "temperature in"]):
+            loc = re.split(r'(?:weather|temperature) (?:in|for|of) ', prompt, flags=re.IGNORECASE)[-1].strip("?.! ")
+            return ("weather", loc if loc else "London")
+
+        # 3. Direct URL Fetch
         url_match = re.search(r'(https?://[^\s]+)', prompt)
         if url_match:
             return ("fetch_url", url_match.group(1))
 
-        # 2. File Reading
+        # 4. File Reading
         file_read_match = re.search(r'(?:read|open|show|view|inspect)\s+(?:the\s+)?(?:file|code)?\s*([a-zA-Z0-9_\-\./\\]+\.[a-zA-Z0-9_]+)', prompt, re.IGNORECASE)
         if file_read_match:
             return ("read_file", file_read_match.group(1))
 
-        # 3. File Writing / Creation
+        # 5. File Writing
         file_write_match = re.search(r'(?:create|write|save)\s+(?:file|to)?\s*([a-zA-Z0-9_\-\./\\]+\.[a-zA-Z0-9_]+)\s*(?:with|as)?\s*[:\n](.+)', prompt, re.IGNORECASE | re.DOTALL)
         if file_write_match:
             return ("write_file", f"{file_write_match.group(1)} ::: {file_write_match.group(2)}")
 
-        # 4. Weather
-        if any(w in prompt_lower for w in ["weather in ", "weather for ", "weather of "]):
-            loc = re.split(r'weather (?:in|for|of) ', prompt, flags=re.IGNORECASE)[-1].strip("?.! ")
-            return ("weather", loc if loc else "London")
-
-        # 5. Shell / PowerShell execution
+        # 6. Shell / PowerShell
         cmd_match = re.search(r'(?:run command|execute command|run shell|run powershell|execute)\s*[:\s]+`?([^`\n]+)`?', prompt, re.IGNORECASE)
         if cmd_match:
             return ("powershell", cmd_match.group(1).strip())
 
-        # 6. Screenshot
-        if any(k in prompt_lower for k in ["take a screenshot", "capture screen", "screenshot"]):
+        # 7. System Vitals / Screenshot / Clipboard
+        if any(k in prompt_lower for k in ["system vitals", "system telemetry", "hardware stats", "ram usage", "cpu usage"]):
+            return ("telemetry", "")
+        if any(k in prompt_lower for k in ["take a screenshot", "capture screen"]):
             return ("screenshot", "")
-
-        # 7. Clipboard
-        if any(k in prompt_lower for k in ["read clipboard", "what's on my clipboard", "clipboard content"]):
+        if any(k in prompt_lower for k in ["read clipboard", "clipboard content"]):
             return ("clipboard_read", "")
 
-        # 8. System Telemetry & Vitals
-        if any(k in prompt_lower for k in ["system vitals", "system telemetry", "hardware stats", "ram usage", "cpu usage", "system info"]):
-            return ("telemetry", "")
+        # 8. Web Search Heuristics (news, current events, recent developments, schedules, launches)
+        search_triggers = [
+            "latest", "recent", "news", "current", "when is", "what is the price",
+            "upcoming", "launching", "schedule", "who won", "score", "today",
+            "search the web", "search for", "google", "look up"
+        ]
+        if self.config.auto_web_search and any(trig in prompt_lower for trig in search_triggers):
+            # Clean search query
+            clean_q = re.sub(r'^(?:search\s+for|search\s+the\s+web\s+for|google|look\s+up|what\s+is\s+the\s+|when\s+is\s+the\s+|who\s+is\s+the\s+)', '', prompt, flags=re.IGNORECASE).strip("?.! ")
+            return ("web_search", clean_q if clean_q else prompt)
 
-        # 9. Wikipedia Lookup
-        if prompt_lower.startswith("who was ") or prompt_lower.startswith("what is ") and "weather" not in prompt_lower:
-            topic = re.sub(r'^(?:who was|what is)\s+', '', prompt_lower, flags=re.IGNORECASE).strip("?.! ")
-            if len(topic.split()) <= 4:
-                return ("wiki", topic)
-
-        # 10. Live Web Search Triggers
-        if self.config.auto_web_search:
-            search_triggers = [
-                "search the web for", "search for", "google", "look up",
-                "latest news", "current price", "today's", "recent developments",
-                "what is the latest", "who is the current", "what happened in",
-                "browse", "news on", "search"
-            ]
-            for trig in search_triggers:
-                if trig in prompt_lower:
-                    query = re.split(re.escape(trig), prompt, flags=re.IGNORECASE)[-1].strip(" :?.!")
-                    return ("web_search", query if query else prompt)
+        # 9. LLM-Driven Autonomous Tool Decision (when uncertain and generate_fn provided)
+        if generate_fn and self.config.auto_web_search:
+            try:
+                decide_prompt = f"{TOOL_SYSTEM_PROMPT}\nUser Query: {prompt}\nJSON Decision:"
+                raw_decision = generate_fn(decide_prompt).strip()
+                # Parse JSON block
+                json_match = re.search(r'\{.*\}', raw_decision, re.DOTALL)
+                if json_match:
+                    data = json.loads(json_match.group(0))
+                    tool = data.get("tool", "none").lower()
+                    arg = data.get("arg", "").strip()
+                    if tool and tool != "none":
+                        if tool == "get_current_time":
+                            return ("time", arg)
+                        return (tool, arg if arg else prompt)
+            except Exception:
+                pass
 
         return None
 
+    def detect_intent(self, prompt: str) -> Optional[Tuple[str, str]]:
+        """Alias for backward compatibility."""
+        return self.decide_tool(prompt)
+
     def execute_tool(self, tool_name: str, arg: str) -> str:
         """Execute a detected tool action."""
-        if tool_name == "web_search":
+        if tool_name == "time":
+            return get_current_time_str(arg)
+        elif tool_name == "web_search":
             return web_search(arg, max_results=self.config.max_search_results)
         elif tool_name == "fetch_url":
             return fetch_url(arg, max_chars=self.config.max_url_chars)

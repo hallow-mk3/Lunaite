@@ -121,6 +121,8 @@ def run_chat_cli(model_name: str = "qwen2.5:7b", deliberate: bool = False):
             print(f"\n{CYAN_MAIN}{C_BOLD}● Lunaite{C_RESET}")
 
             # Execution with tool awareness and deliberation callbacks
+            intent = model.agent.decide_tool(user_input, lambda p: model._raw_generate(p)) if model.agent else None
+
             if deliberate and model.cognitive:
                 response = model.cognitive.deliberate(
                     user_input,
@@ -128,12 +130,31 @@ def run_chat_cli(model_name: str = "qwen2.5:7b", deliberate: bool = False):
                     progress_callback=render_deliberation_status
                 )
                 print(f"\n{response}\n")
-            elif model.agent and model.agent.detect_intent(user_input):
-                intent = model.agent.detect_intent(user_input)
-                if intent:
-                    render_tool_call(intent[0], intent[1])
-                response = model.generate(user_input, use_deliberation=False, use_agent=True)
-                print(f"{response}\n")
+            elif intent:
+                render_tool_call(intent[0], intent[1])
+                tool_output = model.agent.execute_tool(intent[0], intent[1])
+
+                # Assemble synthesis prompt with live tool output and stream it
+                memory_ctx = model.memory.get_context_summary() if model.memory else ""
+                system_prompt = model.cognitive.get_system_prompt(memory_ctx) if model.cognitive else ""
+                augmented_prompt = (
+                    f"{system_prompt}\n\n"
+                    f"[Tool Execution Result — {intent[0].upper()}]:\n"
+                    f"{tool_output}\n\n"
+                    f"User Query: {user_input}\n\n"
+                    f"Based on the tool results above, provide an accurate, clear, and direct answer:"
+                )
+
+                full_tokens = []
+                for chunk in model._raw_stream_generate(augmented_prompt):
+                    sys.stdout.write(chunk)
+                    sys.stdout.flush()
+                    full_tokens.append(chunk)
+                print("\n")
+
+                full_text = "".join(full_tokens).strip()
+                if model.memory and len(full_text.split()) > 8:
+                    model.memory.add_insight(f"Q: {user_input[:50]} -> A: {full_text[:70]}")
             else:
                 # Streaming token generation with full system persona and memory context
                 full_tokens = []

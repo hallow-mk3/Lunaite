@@ -29,6 +29,18 @@
     {
       "timestamp": "2026-08-30 15:26:30",
       "insight": "Q: who are you ?... -> A: I am Qwen, a large language model developed by Alibaba Cloud. I was trained on a..."
+    },
+    {
+      "timestamp": "2026-08-30 15:38:09",
+      "insight": "Q: whats the latest AI news -> A: Hello! \ud83d\ude0a Here's a quick roundup of the latest AI news as of late 2024:"
+    },
+    {
+      "timestamp": "2026-08-30 15:38:46",
+      "insight": "Q: when is Nancy roman space telescope launching ? -> A: The Nancy Grace Roman Space Telescope (formerly known as WFIRST) is cu"
+    },
+    {
+      "timestamp": "2026-08-30 15:39:15",
+      "insight": "Q: whats the time in inida right now -> A: The current time in India (India Standard Time, IST) is **UTC+5:30**. "
     }
   ]
 }
