@@ -1,71 +1,150 @@
 """
-Lunaite Architecture — Command Line Interface (CLI)
-===================================================
-Provides command line execution for Lunaite Architecture:
-- lunaite run <model>           : Interactive chat session with live web search and tools
-- lunaite train                 : Fine-tune model with LoRA / MoE adapters
-- lunaite merge                 : Merge adapters into standalone foundation weights
-- lunaite studio                : Launch the interactive Web Studio
-- lunaite info                  : Display hardware telemetry and architectural diagnostics
+Lunaite Architecture — Modern Interactive CLI
+=============================================
+Claude Code-style intelligent terminal interface with rich cyan_bbt styling,
+streaming generation, tool call banners, and cognitive deliberation traces.
 
 Author: Swasthik Shetty <swasthik.mk3@gmail.com>
 License: MIT
 """
 
 import sys
+import os
+import time
 import argparse
 from typing import Optional
 
 from .config import LunaiteConfig
 from .models.wrapper import wrap
 from .agent.desktop import get_system_telemetry
-from .core.architecture import calculate_architecture_parameters
 
 
-def run_chat_cli(model_name: str = "lunaite-ai", deliberate: bool = False):
-    """Start interactive terminal chat."""
-    print(f"\033[96m\033[1m┌────────────────────────────────────────────────────────┐\033[0m")
-    print(f"\033[96m\033[1m│  Lunaite — Interactive Assistant                       │\033[0m")
-    print(f"\033[96m\033[1m│  Built by Swasthik Shetty (swasthik.mk3@gmail.com)     │\033[0m")
-    print(f"\033[96m\033[1m└────────────────────────────────────────────────────────┘\033[0m")
-    print(f"\033[90mModel: \033[97m{model_name}\033[90m | Reasoning Mode: \033[97m{'ON' if deliberate else 'OFF'}\033[90m\033[0m")
-    print(f"\033[90mCommands: '/exit' to quit, '/clear' to reset, '/deliberate' to toggle reasoning.\033[0m\n")
+# ─── CYAN_BBT PALETTE & ANSI FORMATTING ──────────────────────────────────────
+# Bright cyan (#38bdf8 / #06b6d4), deep cyan, subtle slate borders, muted timestamps
+C_RESET = "\033[0m"
+C_BOLD = "\033[1m"
+C_DIM = "\033[2m"
+C_ITALIC = "\033[3m"
+
+# Cyan_bbt shades
+CYAN_BRIGHT = "\033[38;2;56;189;248m"    # #38bdf8 bright cyan
+CYAN_MAIN = "\033[38;2;6;182;212m"      # #06b6d4 core cyan
+CYAN_DEEP = "\033[38;2;14;116;144m"     # #0e7490 deep cyan accent
+CYAN_BG = "\033[48;2;8;47;73m"          # #082f49 dark cyan background
+SLATE = "\033[38;2;148;163;184m"        # #94a3b8 muted text
+SLATE_DARK = "\033[38;2;71;85;105m"     # #475569 borders/separators
+WHITE_BOLD = "\033[38;2;248;250;252m\033[1m"
+GREEN_ACCENT = "\033[38;2;52;211;153m"  # #34d399 status ok
+AMBER_ACCENT = "\033[38;2;251;191;36m"  # #fbbf24 thinking indicator
+
+
+def print_banner(model_name: str, deliberate: bool):
+    """Render a clean Claude Code-inspired header in cyan_bbt."""
+    cwd = os.getcwd()
+    if len(cwd) > 40:
+        cwd = "..." + cwd[-37:]
+
+    print(f"\n{CYAN_MAIN}{C_BOLD}● Lunaite{C_RESET} {SLATE}v3.0.0{C_RESET} {SLATE_DARK}({model_name}){C_RESET}")
+    print(f"{SLATE_DARK}dir:{C_RESET} {SLATE}{cwd}{C_RESET}")
+    status_mode = f"{CYAN_BRIGHT}on{C_RESET}" if deliberate else f"{SLATE}off{C_RESET}"
+    print(f"{SLATE_DARK}deliberation:{C_RESET} {status_mode} {SLATE_DARK}• type {CYAN_MAIN}/help{SLATE_DARK} for commands{C_RESET}\n")
+
+
+def render_tool_call(tool_name: str, tool_arg: str):
+    """Display an inline Claude Code style tool badge."""
+    print(f"\n{CYAN_DEEP}┌─ {CYAN_BRIGHT}{C_BOLD}Tool: {tool_name}{C_RESET} {SLATE_DARK}({tool_arg}){C_RESET}")
+    print(f"{CYAN_DEEP}└─ Running query...{C_RESET}\n")
+
+
+def render_deliberation_status(stage: str, message: str):
+    """Display deliberation thinking status."""
+    print(f"  {AMBER_ACCENT}⟳ {C_ITALIC}{message}{C_RESET}")
+
+
+def run_chat_cli(model_name: str = "qwen2.5:7b", deliberate: bool = False):
+    """Start interactive Claude Code-style chat session."""
+    print_banner(model_name=model_name, deliberate=deliberate)
 
     model = wrap(model_name)
 
     while True:
         try:
-            user_input = input("\033[96m› \033[0m").strip()
+            # Claude-style prompt prompt
+            prompt_symbol = f"{CYAN_BRIGHT}{C_BOLD}❯{C_RESET} "
+            user_input = input(prompt_symbol).strip()
             if not user_input:
                 continue
 
-            if user_input.lower() in ["/exit", "exit", "quit", ":q"]:
-                print("\033[90mGoodbye!\033[0m")
+            # Command dispatch
+            cmd_lower = user_input.lower()
+            if cmd_lower in ["/exit", "/quit", "exit", "quit", ":q"]:
+                print(f"\n{SLATE}Session ended. Farewell.{C_RESET}\n")
                 break
-            elif user_input.lower() == "/clear":
+            elif cmd_lower in ["/clear", "/reset"]:
                 model.clear_history()
-                print("\033[93m[*] Conversation history cleared.\033[0m")
+                print(f"{SLATE_DARK}Conversation context reset.{C_RESET}\n")
                 continue
-            elif user_input.lower() == "/deliberate":
+            elif cmd_lower == "/deliberate":
                 deliberate = not deliberate
-                print(f"\033[93m[*] Deliberation mode set to: {deliberate}\033[0m")
+                mode_str = f"{CYAN_BRIGHT}enabled{C_RESET}" if deliberate else f"{SLATE}disabled{C_RESET}"
+                print(f"{SLATE_DARK}Deliberation mode {mode_str}.{C_RESET}\n")
+                continue
+            elif cmd_lower in ["/help", "/?"]:
+                print(f"\n{WHITE_BOLD}Lunaite Commands:{C_RESET}")
+                print(f"  {CYAN_MAIN}/deliberate{C_RESET}  - Toggle multi-perspective reasoning")
+                print(f"  {CYAN_MAIN}/clear{C_RESET}       - Clear conversation memory buffer")
+                print(f"  {CYAN_MAIN}/info{C_RESET}        - Show live hardware and system vitals")
+                print(f"  {CYAN_MAIN}/exit{C_RESET}        - Exit session\n")
+                continue
+            elif cmd_lower == "/info":
+                stats = get_system_telemetry()
+                print(f"\n{CYAN_MAIN}{C_BOLD}System Diagnostics:{C_RESET}")
+                print(f"  {SLATE}CPU:{C_RESET} {stats['cpu_percent']}%  {SLATE}RAM:{C_RESET} {stats['ram_used_gb']}/{stats['ram_total_gb']} GB ({stats['ram_percent']}%)")
+                print(f"  {SLATE}GPU:{C_RESET} {stats['gpu_name']} ({stats['gpu_vram_used_gb']} GB VRAM)")
+                print(f"  {SLATE}Disk:{C_RESET} {stats['disk_free_gb']} GB free\n")
                 continue
 
-            print("\033[95m● Lunaite AI:\033[0m ", end="", flush=True)
-            response = model.generate(user_input, use_deliberation=deliberate, use_agent=True)
-            print(f"{response}\n")
+            # Response header
+            print(f"\n{CYAN_MAIN}{C_BOLD}● Lunaite{C_RESET}")
+
+            # Execution with tool awareness and deliberation callbacks
+            if deliberate and model.cognitive:
+                response = model.cognitive.deliberate(
+                    user_input,
+                    lambda p: model._raw_generate(p),
+                    progress_callback=render_deliberation_status
+                )
+                print(f"\n{response}\n")
+            elif model.agent and model.agent.detect_intent(user_input):
+                intent = model.agent.detect_intent(user_input)
+                if intent:
+                    render_tool_call(intent[0], intent[1])
+                response = model.generate(user_input, use_deliberation=False, use_agent=True)
+                print(f"{response}\n")
+            else:
+                # Streaming token generation for conversational speed
+                full_tokens = []
+                try:
+                    for chunk in model._raw_stream_generate(user_input):
+                        sys.stdout.write(chunk)
+                        sys.stdout.flush()
+                        full_tokens.append(chunk)
+                    print("\n")
+                except Exception:
+                    response = model.generate(user_input, use_deliberation=False, use_agent=False)
+                    print(f"{response}\n")
 
         except KeyboardInterrupt:
-            print("\n\033[90mSession interrupted.\033[0m")
+            print(f"\n{SLATE}Interrupted.{C_RESET}\n")
             break
         except Exception as e:
-            print(f"\n\033[91m[Error]: {e}\033[0m\n")
+            print(f"\n\033[91m[Error]: {e}{C_RESET}\n")
 
 
 def main():
     parser = argparse.ArgumentParser(
         prog="lunaite",
-        description="Lunaite — Cognitive Architecture & Agent Runtime for ANY AI Model"
+        description="Lunaite — Claude Code-style Cognitive Architecture & Runtime for ANY Model"
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
@@ -86,14 +165,15 @@ def main():
 
     elif args.command == "info":
         stats = get_system_telemetry()
-        print("=== Lunaite Diagnostics ===")
-        print(f"Author: Swasthik Shetty <swasthik.mk3@gmail.com>")
-        print(f"Repository: https://github.com/hallow-mk3/Lunaite")
-        print(f"CPU Usage: {stats['cpu_percent']}%")
-        print(f"RAM Usage: {stats['ram_used_gb']}GB / {stats['ram_total_gb']}GB ({stats['ram_percent']}%)")
-        print(f"GPU: {stats['gpu_name']} ({stats['gpu_vram_used_gb']}GB VRAM)")
-        print(f"Free Disk: {stats['disk_free_gb']}GB")
+        print(f"\n{CYAN_MAIN}{C_BOLD}Lunaite Diagnostics:{C_RESET}")
+        print(f"  Author: Swasthik Shetty <swasthik.mk3@gmail.com>")
+        print(f"  Repository: https://github.com/hallow-mk3/Lunaite")
+        print(f"  CPU Usage: {stats['cpu_percent']}%")
+        print(f"  RAM Usage: {stats['ram_used_gb']}GB / {stats['ram_total_gb']}GB ({stats['ram_percent']}%)")
+        print(f"  GPU: {stats['gpu_name']} ({stats['gpu_vram_used_gb']}GB VRAM)")
+        print(f"  Free Disk: {stats['disk_free_gb']}GB\n")
 
 
 if __name__ == "__main__":
     main()
+
