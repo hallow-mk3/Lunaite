@@ -62,5 +62,9 @@ class Tool:
         """Execute the tool with validated kwargs and return the result."""
         return self.callable(**kwargs)
 
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        """Allow invoking the tool directly like a function."""
+        return self.callable(*args, **kwargs)
+
     def __repr__(self) -> str:  # pragma: no cover
         return f"Tool(name={self.name!r})"

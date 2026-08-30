@@ -5,7 +5,7 @@ ToolRegistry — a flat, named collection of Tool objects.
 """
 from __future__ import annotations
 
-from typing import Dict, Iterable, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional, Union
 
 from lunaite.tools.tool import Tool
 
@@ -25,20 +25,64 @@ class ToolRegistry:
     # Mutation (setup time only)                                           #
     # ------------------------------------------------------------------ #
 
-    def register(self, tool: Tool) -> None:
-        """Add a tool to the registry.
+    def register(
+        self,
+        tool: Optional[Union[Tool, str]] = None,
+        *,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        parameters: Optional[Dict[str, Any]] = None,
+    ) -> Any:
+        """Add a tool to the registry, or use as a decorator.
 
-        Raises
-        ------
-        ValueError
-            If a tool with the same name is already registered.
+        Usage:
+            # 1. Direct Tool instance
+            registry.register(my_tool)
+
+            # 2. Decorator syntax
+            @registry.register(name="get_weather", description="Fetch weather", parameters={...})
+            def get_weather(city: str):
+                ...
         """
-        if tool.name in self._tools:
-            raise ValueError(
-                f"A tool named {tool.name!r} is already registered. "
-                "Tool names must be unique."
+        # Case 1: Direct Tool instance passed as positional argument
+        if isinstance(tool, Tool):
+            if tool.name in self._tools:
+                raise ValueError(
+                    f"A tool named {tool.name!r} is already registered. "
+                    "Tool names must be unique."
+                )
+            self._tools[tool.name] = tool
+            return tool
+
+        # Case 2: Decorator syntax
+        tool_name = name or (tool if isinstance(tool, str) else None)
+
+        def decorator(fn: Callable[..., Any]) -> Tool:
+            final_name = tool_name or fn.__name__
+            final_desc = description or (fn.__doc__ or "").strip() or f"Tool {final_name}"
+            final_params = parameters or {}
+            
+            # If parameters is a simplified dict without 'type': 'object', wrap it
+            if "type" not in final_params or final_params.get("type") != "object":
+                schema_params = {
+                    "type": "object",
+                    "properties": final_params.get("properties", final_params),
+                }
+                if "required" in final_params:
+                    schema_params["required"] = final_params["required"]
+            else:
+                schema_params = final_params
+
+            new_tool = Tool(
+                name=final_name,
+                description=final_desc,
+                parameters=schema_params,
+                callable=fn,
             )
-        self._tools[tool.name] = tool
+            self.register(new_tool)
+            return new_tool
+
+        return decorator
 
     def register_many(self, tools: Iterable[Tool]) -> None:
         """Convenience method to register multiple tools at once."""

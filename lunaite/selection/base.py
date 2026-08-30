@@ -6,7 +6,7 @@ Abstract base class for all tool selectors.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Optional
 
 from lunaite.tools.registry import ToolRegistry
 from lunaite.tools.tool import Tool
@@ -20,8 +20,11 @@ class Selector(ABC):
     to the LLM for that query.
     """
 
+    def __init__(self, registry: Optional[ToolRegistry] = None) -> None:
+        self.registry = registry
+
     @abstractmethod
-    def select(self, query: str, registry: ToolRegistry, **kwargs) -> List[Tool]:
+    def select(self, query: str, registry: Optional[ToolRegistry] = None, **kwargs) -> List[Tool]:
         """Select a subset of tools relevant to *query*.
 
         Parameters
@@ -29,15 +32,14 @@ class Selector(ABC):
         query:
             The user's natural-language request.
         registry:
-            The full collection of available tools.
+            The full collection of available tools (optional if bound in __init__).
         **kwargs:
             Selector-specific options (e.g. ``k`` for retrieval selectors).
 
         Returns
         -------
         List[Tool]
-            The tools to expose to the LLM.  May be all tools (naive) or a
-            scored subset (retrieval).  Order is meaningful: index 0 is most
+            The tools to expose to the LLM. Order is meaningful: index 0 is most
             relevant.
         """
         ...
