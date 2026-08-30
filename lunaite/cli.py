@@ -201,6 +201,7 @@ def run_chat_cli(
     print_banner(model_name=model_name, deliberate=deliberate)
     model = wrap(model_name, backend=backend)
 
+    last_web_topic = ""  # Track last search subject for pronoun follow-ups
     while True:
         try:
             prompt_symbol = f"{CYAN_BRIGHT}{C_BOLD}❯{C_RESET} "
