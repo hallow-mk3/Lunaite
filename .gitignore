@@ -51,3 +51,7 @@ qwen_27b_model/
 # Logs and scratch files
 *.log
 scratch/
+Prompt.md
+prompt.md
+[Pp]rompt.md
+
