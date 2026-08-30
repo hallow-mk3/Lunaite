@@ -94,23 +94,6 @@ class AgentConfig:
 
 
 @dataclass
-class TrainConfig:
-    """Configuration for Lunaite Fine-Tuning & Adapter Training."""
-    base_model: str = "Qwen/Qwen2.5-7B"
-    output_dir: str = "./lunaite_weights"
-    dataset_path: str = "data/lunaite_training_data.jsonl"
-    epochs: int = 3
-    batch_size: int = 1
-    grad_accum: int = 8
-    learning_rate: float = 2e-4
-    warmup_ratio: float = 0.05
-    weight_decay: float = 0.01
-    max_seq_length: int = 1024
-    quantization: Optional[str] = "4bit"  # "4bit", "8bit", None
-    identity_weight: float = 3.0
-
-
-@dataclass
 class LunaiteConfig:
     """Master Configuration for Lunaite Architecture across any AI model."""
     name: str = "Lunaite Architecture"
@@ -124,7 +107,6 @@ class LunaiteConfig:
     cognitive: CognitiveConfig = field(default_factory=CognitiveConfig)
     memory: MemoryConfig = field(default_factory=MemoryConfig)
     agent: AgentConfig = field(default_factory=AgentConfig)
-    train: TrainConfig = field(default_factory=TrainConfig)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -143,7 +125,6 @@ class LunaiteConfig:
         cog_cfg = CognitiveConfig(**data.get("cognitive", {}))
         mem_cfg = MemoryConfig(**data.get("memory", {}))
         agent_cfg = AgentConfig(**data.get("agent", {}))
-        train_cfg = TrainConfig(**data.get("train", {}))
         return cls(
             name=data.get("name", "Lunaite Architecture"),
             version=data.get("version", "3.0.0"),
@@ -154,8 +135,7 @@ class LunaiteConfig:
             lora=lora_cfg,
             cognitive=cog_cfg,
             memory=mem_cfg,
-            agent=agent_cfg,
-            train=train_cfg
+            agent=agent_cfg
         )
 
     @classmethod

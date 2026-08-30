@@ -14,7 +14,7 @@ __version__ = "3.0.0"
 __author__ = "Swasthik Shetty"
 __email__ = "swasthik.mk3@gmail.com"
 
-from .config import LunaiteConfig, MoEConfig, LoRAConfig, CognitiveConfig, MemoryConfig, AgentConfig, TrainConfig
+from .config import LunaiteConfig, MoEConfig, LoRAConfig, CognitiveConfig, MemoryConfig, AgentConfig
 from .core.architecture import (
     LunaiteMoERouter,
     LunaiteExpert,
@@ -32,9 +32,6 @@ from .models.ollama import LunaiteOllamaModel
 from .models.huggingface import LunaiteHuggingFaceModel
 from .models.api import LunaiteAPIModel
 from .models.wrapper import wrap, from_ollama, from_huggingface, from_api
-from .train.trainer import LunaiteTrainer
-from .train.dataset import load_dataset_file, generate_preset_dataset
-from .train.exporter import merge_and_save_model, generate_ollama_modelfile
 
 __all__ = [
     "__version__",
@@ -47,7 +44,6 @@ __all__ = [
     "CognitiveConfig",
     "MemoryConfig",
     "AgentConfig",
-    "TrainConfig",
     # Core Architecture
     "LunaiteMoERouter",
     "LunaiteExpert",
@@ -77,10 +73,4 @@ __all__ = [
     "from_ollama",
     "from_huggingface",
     "from_api",
-    # Training & Export
-    "LunaiteTrainer",
-    "load_dataset_file",
-    "generate_preset_dataset",
-    "merge_and_save_model",
-    "generate_ollama_modelfile",
 ]

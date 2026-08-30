@@ -1,6 +1,8 @@
-# Lunaite Tutorial & Complete Guide
+# Lunaite
 
-**A practical walkthrough for using Lunaite to give any model reasoning, memory, tools, MoE layers, and interactive diagrams.**
+**Universal Cognitive Architecture & Agent Runtime for ANY AI Model.**
+
+Lunaite attaches multi-step reasoning, persistent memory, live web search, system telemetry, and MoE routing to your local models (Ollama), Hugging Face models, or Cloud APIs—just like a modular intelligence layer.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
@@ -8,235 +10,96 @@
 
 ---
 
-## Table of Contents
-
-1. [Installation](#1-installation)
-2. [Wrapping Models (Ollama, Hugging Face, APIs)](#2-wrapping-models)
-3. [Deliberation & Reasoning](#3-deliberation--reasoning)
-4. [Live Web Tools & Telemetry](#4-live-web-tools--telemetry)
-5. [Persistent Memory Bank](#5-persistent-memory-bank)
-6. [PyTorch MoE Layers](#6-pytorch-moe-layers)
-7. [Interactive Diagrams Visualizer](#7-interactive-diagrams-visualizer)
-8. [Command Line Interface (CLI)](#8-command-line-interface-cli)
-9. [Fine-Tuning & Adapter Export](#9-fine-tuning--adapter-export)
-
----
-
-## 1. Installation
-
-Install in editable mode for development:
+## Quick Start
 
 ```bash
+# Clone and install
 git clone https://github.com/hallow-mk3/Lunaite.git
 cd Lunaite
 pip install -e .
 ```
 
+### 1. Terminal Chat (CLI)
+
+Run interactive chat with any local Ollama model (auto-launches Ollama if not already running):
+
+```bash
+# Standard chat with tools (DuckDuckGo, Wikipedia, Weather, Telemetry)
+python -m lunaite.cli run qwen2.5:7b
+
+# Chat with deep multi-perspective deliberation & verification
+python -m lunaite.cli run qwen2.5:7b --deliberate
+```
+
 ---
 
-## 2. Wrapping Models
-
-Lunaite's `wrap()` function automatically detects your backend and equips the model with cognitive memory and tool capabilities.
-
-### Local Ollama Models
+### 2. Python SDK
 
 ```python
 import lunaite
 
-# Connect to any local model (e.g. Qwen 2.5, LLaMA 3.1, Mistral)
+# Wrap any local Ollama model
 model = lunaite.wrap("qwen2.5:7b")
 
-response = model.chat("Hello! What are you capable of?")
-print(response)
-```
+# Use live web tools automatically
+print(model.generate("What is the latest news on NASA missions?", use_agent=True))
 
-### Hugging Face Transformers
+# Multi-perspective reasoning (Physics, Logic, Practical Systems)
+print(model.generate("Explain quantum superposition and its core paradoxes.", use_deliberation=True))
 
-```python
-import lunaite
-
-# Wrap a Hugging Face CausalLM
-model = lunaite.wrap("Qwen/Qwen2.5-1.5B-Instruct", backend="huggingface")
-print(model.chat("Explain the difference between TCP and UDP."))
-```
-
-### Cloud APIs (OpenAI-compatible)
-
-```python
-import lunaite
-
-# Wrap an API model
-model = lunaite.wrap("gpt-4o", backend="api")
-print(model.chat("Summarize today's goals."))
+# Remembers conversation context across sessions
+print(model.chat("Remember that my primary development language is Python."))
 ```
 
 ---
 
-## 3. Deliberation & Reasoning
+## Supported Backends
 
-When you need deep, multi-perspective analysis on complex questions, enable deliberation:
-
-```python
-import lunaite
-
-model = lunaite.from_ollama("qwen2.5:7b")
-
-# Runs parallel perspective analysis (Physics, Logic, Systems) and verifies the answer
-deep_answer = model.generate(
-    "Explain the implications of quantum gravity on black hole information loss.",
-    use_deliberation=True
-)
-print(deep_answer)
-```
-
----
-
-## 4. Live Web Tools & Telemetry
-
-Lunaite includes autonomous tool detection for live web search, Wikipedia lookups, weather forecasts, URL article scraping, and system telemetry:
+Lunaite seamlessly wraps any model backend:
 
 ```python
 import lunaite
 
-model = lunaite.from_ollama("qwen2.5:7b")
+# 1. Local Ollama (llama3, qwen2.5, mistral, gemma, phi3)
+m1 = lunaite.wrap("llama3.1:8b")
 
-# Live web search & synthesis
-print(model.generate("What is the latest news on Artemis missions?", use_agent=True))
+# 2. Hugging Face Transformers
+m2 = lunaite.wrap("meta-llama/Llama-3-8B-Instruct", backend="huggingface")
 
-# Live weather
-print(model.generate("What is the weather in Tokyo right now?", use_agent=True))
-
-# System hardware status
-print(model.generate("What are my current system vitals and RAM usage?", use_agent=True))
+# 3. Cloud APIs (OpenAI-compatible)
+m3 = lunaite.wrap("gpt-4o", backend="api")
 ```
 
 ---
 
-## 5. Persistent Memory Bank
+## Standalone PyTorch MoE Layer
 
-Lunaite saves user facts, preferences, and key conversation insights across sessions into `lunaite_memory.json`:
-
-```python
-import lunaite
-
-model = lunaite.from_ollama("qwen2.5:7b")
-
-# Store a fact
-model.chat("Please remember that my favorite programming language is Rust.")
-
-# In a later session, Lunaite automatically recalls this context
-print(model.chat("What programming language should I use for a high-throughput network service?"))
-```
-
-You can also access memory directly:
-
-```python
-from lunaite import LunaiteMemory
-
-memory = LunaiteMemory()
-memory.remember("user_facts", "location", "Bengaluru")
-print(memory.get_fact("location"))  # 'Bengaluru'
-```
-
----
-
-## 6. PyTorch MoE Layers
-
-You can use Lunaite's sparse Mixture-of-Experts building blocks directly inside your own neural networks:
+You can also use Lunaite's sparse Mixture-of-Experts building blocks inside your own neural architectures:
 
 ```python
 import torch
 from lunaite import LunaiteMoELayer
 
-# 8 experts, top-2 active per token
-moe = LunaiteMoELayer(
-    d_model=4096,
-    num_experts=8,
-    top_k=2,
-    expert_dim=1024
-)
-
-# Input shape: (batch_size, seq_len, d_model)
-tokens = torch.randn(2, 16, 4096)
-output, aux_loss = moe(tokens)
-
-print("Output tensor shape:", output.shape)
-print("Load balancing loss:", aux_loss.item())
+moe = LunaiteMoELayer(d_model=4096, num_experts=8, top_k=2, expert_dim=1024)
+x = torch.randn(2, 16, 4096)
+output, aux_loss = moe(x)
 ```
 
 ---
 
-## 7. Interactive Diagrams Visualizer
+## Interactive Diagrams
 
-Generate vector-crisp, dark-themed interactive HTML architecture and sequence diagrams with zoom controls and one-click SVG export:
+Generate vector-crisp standalone HTML diagrams for architectures and workflows:
 
 ```bash
-# Render a diagram to standalone HTML
 python .agents/skills/interactive-diagrams/scripts/render_diagram.py \
   --title "System Architecture" \
-  --output "docs/my_diagram.html"
-```
-
-Or programmatically in Python:
-
-```python
-from .agents.skills.interactive_diagrams.scripts.render_diagram import generate_diagram_html
-
-mermaid_code = """
-graph TD
-    Client[Client Request] --> Engine[Lunaite Engine]
-    Engine --> Deliberation[Cognitive Deliberation]
-    Engine --> Tools[Live Web Tools]
-    Engine --> MoE[MoE Router]
-    MoE --> Output[Consensus Output]
-"""
-
-generate_diagram_html(
-    title="Workflow Topology",
-    description="Lunaite Pipeline Overview",
-    mermaid_code=mermaid_code,
-    output_path="docs/pipeline.html"
-)
-```
-
----
-
-## 8. Command Line Interface (CLI)
-
-Run interactive chat and utilities directly from your terminal:
-
-```bash
-# Terminal chat with any model
-python -m lunaite.cli run qwen2.5:7b
-
-# Terminal chat with deep deliberation
-python -m lunaite.cli run llama3.1:8b --deliberate
-
-# View hardware stats and diagnostics
-python -m lunaite.cli info
-```
-
-*(Note: If you have Python's Scripts folder in your system PATH, you can also use `lunaite run qwen2.5:7b` directly).*
-
----
-
-## 9. Fine-Tuning & Adapter Export
-
-Fine-tune models with LoRA and MoE adapters and merge weights:
-
-```bash
-# Train on a dataset
-python -m lunaite.cli train --base-model Qwen/Qwen2.5-7B --dataset data/lunaite_training_data.jsonl --epochs 3
-
-# Merge adapter weights into a standalone model
-python -m lunaite.cli merge --base-model Qwen/Qwen2.5-7B --adapter ./lunaite_weights --output ./lunaite_merged
+  --output "docs/architecture.html"
 ```
 
 ---
 
 ## Testing
-
-Run the automated test suite:
 
 ```bash
 python -m unittest discover tests

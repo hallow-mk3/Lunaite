@@ -21,6 +21,14 @@
     {
       "timestamp": "2026-08-30 15:20:56",
       "insight": "Q: hi... -> A: [Lunaite Ollama Error]: Could not reach Ollama at http://localhost:11434 (<urlop..."
+    },
+    {
+      "timestamp": "2026-08-30 15:24:54",
+      "insight": "Q: hi... -> A: Hello! \ud83d\ude0a How can I assist you today? If you have any questions or need help with..."
+    },
+    {
+      "timestamp": "2026-08-30 15:26:30",
+      "insight": "Q: who are you ?... -> A: I am Qwen, a large language model developed by Alibaba Cloud. I was trained on a..."
     }
   ]
 }

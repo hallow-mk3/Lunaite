@@ -65,61 +65,28 @@ def run_chat_cli(model_name: str = "lunaite-ai", deliberate: bool = False):
 def main():
     parser = argparse.ArgumentParser(
         prog="lunaite",
-        description="Lunaite Architecture — Universal AI Architecture Framework by Swasthik Shetty"
+        description="Lunaite — Cognitive Architecture & Agent Runtime for ANY AI Model"
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
-    # Run
-    run_parser = subparsers.add_parser("run", help="Run interactive chat with any model")
-    run_parser.add_argument("model", nargs="?", default="lunaite-ai", help="Model name or tag (e.g. qwen2.5:7b, llama3.1:8b, gpt-4o)")
-    run_parser.add_argument("--deliberate", action="store_true", help="Enable multi-perspective deliberation")
+    # Run command
+    run_parser = subparsers.add_parser("run", help="Run interactive chat with any model (e.g. qwen2.5:7b, llama3.1:8b, gpt-4o)")
+    run_parser.add_argument("model", nargs="?", default="qwen2.5:7b", help="Model name or tag")
+    run_parser.add_argument("--deliberate", action="store_true", help="Enable multi-perspective cognitive deliberation")
 
-    # Train
-    train_parser = subparsers.add_parser("train", help="Fine-tune model with LoRA/MoE")
-    train_parser.add_argument("--base-model", default="Qwen/Qwen2.5-7B", help="Base model ID")
-    train_parser.add_argument("--dataset", default="data/lunaite_training_data.jsonl", help="Dataset file")
-    train_parser.add_argument("--epochs", type=int, default=3, help="Training epochs")
-    train_parser.add_argument("--output", default="./lunaite_weights", help="Output directory")
-
-    # Merge
-    merge_parser = subparsers.add_parser("merge", help="Merge adapter weights into base model")
-    merge_parser.add_argument("--base-model", required=True, help="Base model ID")
-    merge_parser.add_argument("--adapter", required=True, help="Adapter weights directory")
-    merge_parser.add_argument("--output", required=True, help="Output merged directory")
-
-    # Info
-    subparsers.add_parser("info", help="Show system telemetry and architectural diagnostics")
+    # Info command
+    subparsers.add_parser("info", help="Show system telemetry and diagnostics")
 
     args = parser.parse_args()
 
     if args.command == "run" or args.command is None:
-        model_name = getattr(args, "model", "lunaite-ai") or "lunaite-ai"
+        model_name = getattr(args, "model", "qwen2.5:7b") or "qwen2.5:7b"
         deliberate = getattr(args, "deliberate", False)
         run_chat_cli(model_name=model_name, deliberate=deliberate)
 
-    elif args.command == "train":
-        from .train.trainer import LunaiteTrainer
-        from .config import TrainConfig
-        cfg = TrainConfig(
-            base_model=args.base_model,
-            dataset_path=args.dataset,
-            epochs=args.epochs,
-            output_dir=args.output
-        )
-        trainer = LunaiteTrainer(cfg)
-        trainer.train()
-
-    elif args.command == "merge":
-        from .train.exporter import merge_and_save_model
-        merge_and_save_model(
-            base_model_id=args.base_model,
-            adapter_dir=args.adapter,
-            output_dir=args.output
-        )
-
     elif args.command == "info":
         stats = get_system_telemetry()
-        print("=== Lunaite Architecture Diagnostics ===")
+        print("=== Lunaite Diagnostics ===")
         print(f"Author: Swasthik Shetty <swasthik.mk3@gmail.com>")
         print(f"Repository: https://github.com/hallow-mk3/Lunaite")
         print(f"CPU Usage: {stats['cpu_percent']}%")
