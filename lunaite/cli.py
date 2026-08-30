@@ -91,10 +91,23 @@ def run_chat_cli(model_name: str = "qwen2.5:7b", deliberate: bool = False):
                 continue
             elif cmd_lower in ["/help", "/?"]:
                 print(f"\n{WHITE_BOLD}Lunaite Commands:{C_RESET}")
+                print(f"  {CYAN_MAIN}/tools{C_RESET}       - List all available tools & triggers")
                 print(f"  {CYAN_MAIN}/deliberate{C_RESET}  - Toggle multi-perspective reasoning")
                 print(f"  {CYAN_MAIN}/clear{C_RESET}       - Clear conversation memory buffer")
                 print(f"  {CYAN_MAIN}/info{C_RESET}        - Show live hardware and system vitals")
                 print(f"  {CYAN_MAIN}/exit{C_RESET}        - Exit session\n")
+                continue
+            elif cmd_lower == "/tools":
+                print(f"\n{WHITE_BOLD}Available Lunaite Tools:{C_RESET}")
+                print(f"  {CYAN_BRIGHT}● Web Search{C_RESET}    {SLATE}Live DuckDuckGo search{C_RESET}       {SLATE_DARK}(e.g. 'search for latest AI news'){C_RESET}")
+                print(f"  {CYAN_BRIGHT}● Wikipedia{C_RESET}     {SLATE}Article knowledge lookup{C_RESET}     {SLATE_DARK}(e.g. 'who was Alan Turing?'){C_RESET}")
+                print(f"  {CYAN_BRIGHT}● Weather{C_RESET}       {SLATE}Global forecast by city{C_RESET}      {SLATE_DARK}(e.g. 'weather in Tokyo'){C_RESET}")
+                print(f"  {CYAN_BRIGHT}● Read File{C_RESET}     {SLATE}Inspect file contents{C_RESET}        {SLATE_DARK}(e.g. 'read the file README.md'){C_RESET}")
+                print(f"  {CYAN_BRIGHT}● Write File{C_RESET}    {SLATE}Create or save file{C_RESET}         {SLATE_DARK}(e.g. 'save file notes.txt : content'){C_RESET}")
+                print(f"  {CYAN_BRIGHT}● Shell/CLI{C_RESET}     {SLATE}Run PowerShell/shell cmd{C_RESET}     {SLATE_DARK}(e.g. 'run command: git status'){C_RESET}")
+                print(f"  {CYAN_BRIGHT}● Screenshot{C_RESET}    {SLATE}Capture screen image{C_RESET}         {SLATE_DARK}(e.g. 'take a screenshot'){C_RESET}")
+                print(f"  {CYAN_BRIGHT}● Clipboard{C_RESET}     {SLATE}Read system clipboard{C_RESET}        {SLATE_DARK}(e.g. 'read clipboard'){C_RESET}")
+                print(f"  {CYAN_BRIGHT}● Telemetry{C_RESET}     {SLATE}CPU, RAM, GPU, Disk stats{C_RESET}    {SLATE_DARK}(e.g. 'system vitals' or /info){C_RESET}\n")
                 continue
             elif cmd_lower == "/info":
                 stats = get_system_telemetry()
