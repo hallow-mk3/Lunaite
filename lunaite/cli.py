@@ -254,7 +254,9 @@ def run_chat_cli(
 
             # Execution with tool awareness and deliberation callbacks
             memory_ctx = model.memory.get_context_summary() if model.memory else ""
-            intent = model.agent.decide_tool(user_input, lambda p: model._raw_generate(p), context=memory_ctx) if model.agent else None
+            # Inject last known topic so follow-up pronouns ("it", "this") resolve correctly
+            enriched_ctx = f"Q: {last_web_topic}" if last_web_topic else memory_ctx
+            intent = model.agent.decide_tool(user_input, lambda p: model._raw_generate(p), context=enriched_ctx) if model.agent else None
 
             if deliberate and model.cognitive:
                 response = model.cognitive.deliberate(
@@ -266,6 +268,9 @@ def run_chat_cli(
             elif intent:
                 render_tool_call(intent[0], intent[1])
                 tool_output = model.agent.execute_tool(intent[0], intent[1])
+                # Remember the core topic of this web search for follow-up turns
+                if intent[0] == "web_search":
+                    last_web_topic = intent[1]
 
                 memory_ctx = model.memory.get_context_summary() if model.memory else ""
                 system_prompt = model.cognitive.get_system_prompt(memory_ctx) if model.cognitive else ""
