@@ -1,0 +1,3 @@
+# Linguistics / Linguist Language Overrides
+paper/* linguist-documentation
+data/* linguist-vendored
