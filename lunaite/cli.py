@@ -269,8 +269,8 @@ def run_chat_cli(
             elif intent:
                 render_tool_call(intent[0], intent[1])
                 tool_output = model.agent.execute_tool(intent[0], intent[1])
-                # Remember the core topic of this web search for follow-up turns
-                if intent[0] == "web_search":
+                # Track subject for ALL tool calls so follow-up pronouns resolve correctly
+                if intent[0] in ("web_search", "wiki", "weather", "time"):
                     last_web_topic = intent[1]
 
                 memory_ctx = model.memory.get_context_summary() if model.memory else ""
@@ -280,7 +280,9 @@ def run_chat_cli(
                     f"[Tool Execution Result — {intent[0].upper()}]:\n"
                     f"{tool_output}\n\n"
                     f"User Query: {user_input}\n\n"
-                    f"Based on the tool results above, provide an accurate, clear, and direct answer:"
+                    f"IMPORTANT: Answer ONLY using the tool results above. "
+                    f"Do NOT invent names, organizations, or facts not present in the results. "
+                    f"If the specific answer is not in the results, say so clearly and suggest the user check an official source."
                 )
 
                 full_tokens = []
