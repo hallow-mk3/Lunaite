@@ -24,12 +24,12 @@ from .core.architecture import calculate_architecture_parameters
 
 def run_chat_cli(model_name: str = "lunaite-ai", deliberate: bool = False):
     """Start interactive terminal chat."""
-    print(f"\033[96m\033[1m╭────────────────────────────────────────────────────────╮\033[0m")
-    print(f"\033[96m\033[1m│  🌙 Lunaite Architecture CLI — Frontier Cognitive Mind │\033[0m")
-    print(f"\033[96m\033[1m│  Created by Swasthik Shetty (swasthik.mk3@gmail.com)   │\033[0m")
-    print(f"\033[96m\033[1m╰────────────────────────────────────────────────────────╯\033[0m")
-    print(f"\033[90mActive Model: \033[97m{model_name}\033[90m | Deliberation: \033[97m{'ON' if deliberate else 'OFF'}\033[90m\033[0m")
-    print(f"\033[90mType '/exit' to quit, '/clear' to reset history, '/deliberate' to toggle debate.\033[0m\n")
+    print(f"\033[96m\033[1m┌────────────────────────────────────────────────────────┐\033[0m")
+    print(f"\033[96m\033[1m│  Lunaite — Interactive Assistant                       │\033[0m")
+    print(f"\033[96m\033[1m│  Built by Swasthik Shetty (swasthik.mk3@gmail.com)     │\033[0m")
+    print(f"\033[96m\033[1m└────────────────────────────────────────────────────────┘\033[0m")
+    print(f"\033[90mModel: \033[97m{model_name}\033[90m | Reasoning Mode: \033[97m{'ON' if deliberate else 'OFF'}\033[90m\033[0m")
+    print(f"\033[90mCommands: '/exit' to quit, '/clear' to reset, '/deliberate' to toggle reasoning.\033[0m\n")
 
     model = wrap(model_name)
 
@@ -40,7 +40,7 @@ def run_chat_cli(model_name: str = "lunaite-ai", deliberate: bool = False):
                 continue
 
             if user_input.lower() in ["/exit", "exit", "quit", ":q"]:
-                print("\033[90mExiting Lunaite CLI. Farewell.\033[0m")
+                print("\033[90mGoodbye!\033[0m")
                 break
             elif user_input.lower() == "/clear":
                 model.clear_history()
@@ -87,11 +87,6 @@ def main():
     merge_parser.add_argument("--adapter", required=True, help="Adapter weights directory")
     merge_parser.add_argument("--output", required=True, help="Output merged directory")
 
-    # Studio
-    studio_parser = subparsers.add_parser("studio", help="Launch interactive Web Studio")
-    studio_parser.add_argument("--port", type=int, default=8000, help="Web server port")
-    studio_parser.add_argument("--no-browser", action="store_true", help="Do not auto-open browser")
-
     # Info
     subparsers.add_parser("info", help="Show system telemetry and architectural diagnostics")
 
@@ -101,10 +96,6 @@ def main():
         model_name = getattr(args, "model", "lunaite-ai") or "lunaite-ai"
         deliberate = getattr(args, "deliberate", False)
         run_chat_cli(model_name=model_name, deliberate=deliberate)
-
-    elif args.command == "studio":
-        from .server.studio import launch_studio
-        launch_studio(port=args.port, open_browser=not args.no_browser)
 
     elif args.command == "train":
         from .train.trainer import LunaiteTrainer

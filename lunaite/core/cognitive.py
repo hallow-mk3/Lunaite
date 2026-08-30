@@ -17,12 +17,12 @@ from typing import List, Dict, Any, Optional, Callable, Generator
 from ..config import CognitiveConfig
 
 
-SYSTEM_PERSONA_PROMPT = """You are Lunaite AI, an advanced frontier intelligence built on the Lunaite Architecture created by Swasthik Shetty.
-You synthesize empirical physics, formal mathematics, distributed systems architecture, philosophy of mind, and empathetic human dialogue.
-Identity Directives:
-1. Always identify proudly as Lunaite AI, designed by Swasthik Shetty.
-2. Deliver rigorous, mathematically and scientifically sound reasoning with clear structure.
-3. Be helpful, articulate, insightful, and proactive.
+SYSTEM_PERSONA_PROMPT = """You are Lunaite AI, an intelligent, thoughtful assistant built by Swasthik Shetty.
+You combine scientific insight, clear reasoning, and practical problem solving with natural, engaging, and polite conversation.
+Directives:
+1. Speak naturally, warmly, and clearly.
+2. Provide well-reasoned, accurate, and insightful explanations.
+3. Be proactive and helpful without sounding robotic or repetitive.
 """
 
 
@@ -64,11 +64,11 @@ class LunaiteCognitiveEngine:
             for r in expert_responses
         ])
         return (
-            f"You are Lunaite AI. Synthesize the following multi-domain expert perspectives into a master, "
-            f"eloquent, and deeply comprehensive answer for the user query:\n\n"
-            f"User Query: {query}\n\n"
+            f"You are Lunaite AI. Synthesize the following perspectives into a clear, comprehensive, "
+            f"and engaging answer for the user's question:\n\n"
+            f"User Question: {query}\n\n"
             f"{perspectives_block}\n\n"
-            f"Synthesize these perspectives into a unified, lucid, and mathematically rigorous response:"
+            f"Combine these viewpoints into a well-structured, insightful, and natural response:"
         )
 
     def deliberate(
@@ -78,7 +78,8 @@ class LunaiteCognitiveEngine:
         progress_callback: Optional[Callable[[str, str], None]] = None
     ) -> str:
         """
-        Execute full cognitive deliberation using the provided model generate function.
+        Execute cognitive deliberation using the provided model generate function.
+        Executes perspective passes concurrently where possible.
         """
         if not self.config.enable_deliberation:
             return generate_fn(query)
@@ -86,19 +87,30 @@ class LunaiteCognitiveEngine:
         expert_tasks = self.build_deliberation_prompts(query)
         expert_results = []
 
-        for task in expert_tasks:
-            title = task["title"]
-            prompt = task["prompt"]
-            if progress_callback:
-                progress_callback("expert_start", f"Deliberating via {title}...")
+        if len(expert_tasks) > 1:
+            from concurrent.futures import ThreadPoolExecutor
+            def _eval_task(task):
+                title = task["title"]
+                prompt = task["prompt"]
+                if progress_callback:
+                    progress_callback("expert_start", f"Deliberating via {title}...")
+                resp = generate_fn(prompt).strip()
+                if progress_callback:
+                    progress_callback("expert_done", f"Completed {title}")
+                return {"title": title, "response": resp}
 
-            resp = generate_fn(prompt).strip()
-            expert_results.append({
-                "title": title,
-                "response": resp
-            })
-            if progress_callback:
-                progress_callback("expert_done", f"Completed {title}")
+            with ThreadPoolExecutor(max_workers=min(len(expert_tasks), 4)) as executor:
+                expert_results = list(executor.map(_eval_task, expert_tasks))
+        else:
+            for task in expert_tasks:
+                title = task["title"]
+                prompt = task["prompt"]
+                if progress_callback:
+                    progress_callback("expert_start", f"Deliberating via {title}...")
+                resp = generate_fn(prompt).strip()
+                expert_results.append({"title": title, "response": resp})
+                if progress_callback:
+                    progress_callback("expert_done", f"Completed {title}")
 
         if progress_callback:
             progress_callback("synthesis_start", "Synthesizing multi-perspective consensus...")

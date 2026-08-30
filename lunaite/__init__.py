@@ -35,7 +35,6 @@ from .models.wrapper import wrap, from_ollama, from_huggingface, from_api
 from .train.trainer import LunaiteTrainer
 from .train.dataset import load_dataset_file, generate_preset_dataset
 from .train.exporter import merge_and_save_model, generate_ollama_modelfile
-from .server.studio import launch_studio
 
 __all__ = [
     "__version__",
@@ -84,6 +83,4 @@ __all__ = [
     "generate_preset_dataset",
     "merge_and_save_model",
     "generate_ollama_modelfile",
-    # Server
-    "launch_studio",
 ]

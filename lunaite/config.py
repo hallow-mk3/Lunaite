@@ -51,16 +51,16 @@ class CognitiveConfig:
     num_perspectives: int = 3
     perspectives: List[Dict[str, str]] = field(default_factory=lambda: [
         {
-            "name": "Empirical & Physical Sciences",
-            "prompt_prefix": "From the perspective of empirical physics, relativity, and thermodynamics, provide a rigorous analysis:"
+            "name": "Scientific & Physical Principles",
+            "prompt_prefix": "Looking at this through fundamental physics and empirical facts:"
         },
         {
-            "name": "Mathematical Logic & Information Theory",
-            "prompt_prefix": "From the perspective of formal logic, discrete mathematics, and computational complexity, provide a structured breakdown:"
+            "name": "Logic & Structure",
+            "prompt_prefix": "Breaking this down with clear logic and step-by-step reasoning:"
         },
         {
-            "name": "Systems Architecture & Philosophy",
-            "prompt_prefix": "From the perspective of systems architecture, ontology, and first-principles reasoning, provide a synthesised insight:"
+            "name": "Practical Systems & Big Picture",
+            "prompt_prefix": "Considering real-world systems, trade-offs, and practical impact:"
         }
     ])
     verification_loop: bool = True
