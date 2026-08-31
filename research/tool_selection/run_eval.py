@@ -37,7 +37,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_REPO_ROOT))
 
 from lunaite.harness import Harness, HarnessResult
-from lunaite.selection import NaiveSelector, RetrievalSelector
+from lunaite.selection import NaiveSelector, RetrievalSelector, HybridSelector
 from lunaite.tools import ToolRegistry
 
 from research.tool_selection.tools_library import build_registry

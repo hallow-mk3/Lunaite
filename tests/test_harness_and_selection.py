@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 from lunaite.tools import Tool, ToolRegistry
-from lunaite.selection import NaiveSelector, RetrievalSelector
+from lunaite.selection import NaiveSelector, RetrievalSelector, HybridSelector
 from lunaite.harness.harness import Harness, HarnessResult
 from research.tool_selection.tools_library import build_registry, ALL_TOOLS
 
@@ -72,6 +72,16 @@ class TestHarnessAndSelection(unittest.TestCase):
         selector = RetrievalSelector(self.registry, k=10)
         selected = selector.select("Any query")
         self.assertEqual(len(selected), 3)
+
+    def test_hybrid_selector(self):
+        selector = HybridSelector(self.registry, k=1, alpha=0.5)
+        selected_weather = selector.select("Fetch current weather in Tokyo")
+        self.assertEqual(len(selected_weather), 1)
+        self.assertEqual(selected_weather[0].name, "get_weather")
+
+        selected_curr = selector.select("Convert currency USD to EUR")
+        self.assertEqual(len(selected_curr), 1)
+        self.assertEqual(selected_curr[0].name, "convert_currency")
 
     def test_harness_openai_schema_conversion(self):
         tool = self.registry.get("get_weather")
