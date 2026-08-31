@@ -1,9 +1,8 @@
 """
-Lunaite — Universal Modular AI Architecture Framework
-=====================================================
-A unified, high-performance architecture framework designed by Swasthik Shetty.
-Attaches Sparse Mixture-of-Experts (MoE) residual routing, multi-perspective cognitive
-deliberation, multi-tier episodic memory, and autonomous agent tool capabilities to ANY AI model.
+Lunaite — Intelligent Tool Selection & Lightweight Agent Harness
+================================================================
+A high-performance LLM harness for evaluating and deploying intelligent
+tool-selection algorithms (Naive, Dense Vector Retrieval, Hybrid RRF) at scale.
 
 Author: Swasthik Shetty <swasthik.mk3@gmail.com>
 GitHub: https://github.com/hallow-mk3/Lunaite
