@@ -33,6 +33,18 @@ except ImportError:
     HAS_PYAUTOGUI = False
 
 
+def _get_hidden_kwargs() -> Dict[str, Any]:
+    """Return subprocess flags to prevent console windows from flashing on Windows."""
+    kwargs: Dict[str, Any] = {}
+    if sys.platform == "win32":
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = 0  # SW_HIDE
+        kwargs["startupinfo"] = startupinfo
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+    return kwargs
+
+
 def get_system_telemetry() -> Dict[str, Any]:
     """Retrieve real-time hardware telemetry."""
     data = {
@@ -98,7 +110,13 @@ def read_clipboard() -> str:
             pass
     if sys.platform == "win32":
         try:
-            res = subprocess.run(["powershell", "-command", "Get-Clipboard"], capture_output=True, text=True, timeout=3)
+            res = subprocess.run(
+                ["powershell", "-NoProfile", "-NonInteractive", "-Command", "Get-Clipboard"],
+                capture_output=True,
+                text=True,
+                timeout=3,
+                **_get_hidden_kwargs()
+            )
             return res.stdout.strip()
         except Exception as e:
             return f"[Clipboard Read Error]: {e}"
@@ -109,7 +127,12 @@ def write_clipboard(text: str) -> str:
     """Copy text to system clipboard."""
     if sys.platform == "win32":
         try:
-            p = subprocess.Popen(["clip"], stdin=subprocess.PIPE, shell=True)
+            p = subprocess.Popen(
+                ["clip"],
+                stdin=subprocess.PIPE,
+                shell=False,
+                **_get_hidden_kwargs()
+            )
             p.communicate(text.encode("utf-8"))
             return "Copied to clipboard."
         except Exception as e:
@@ -118,14 +141,26 @@ def write_clipboard(text: str) -> str:
 
 
 def run_powershell(cmd: str, timeout: int = 15) -> str:
-    """Execute PowerShell command safely."""
+    """Execute PowerShell command safely without flashing console windows."""
     try:
         if sys.platform == "win32":
-            res = subprocess.run(["powershell", "-NoProfile", "-Command", cmd], capture_output=True, text=True, timeout=timeout)
+            res = subprocess.run(
+                ["powershell", "-NoProfile", "-NonInteractive", "-Command", cmd],
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                **_get_hidden_kwargs()
+            )
             out = res.stdout.strip() or res.stderr.strip()
             return out if out else "[Command completed with zero output]"
         else:
-            res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
+            res = subprocess.run(
+                cmd,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=timeout
+            )
             out = res.stdout.strip() or res.stderr.strip()
             return out if out else "[Command completed with zero output]"
     except Exception as e:
@@ -171,14 +206,22 @@ def list_running_applications() -> List[str]:
 
 
 def kill_process(target: str) -> str:
-    """Terminate process by name or PID."""
+    """Terminate process by name or PID without flashing console windows."""
     if sys.platform == "win32":
         try:
             if target.isdigit():
-                subprocess.run(["taskkill", "/F", "/PID", target], check=False)
+                subprocess.run(
+                    ["taskkill", "/F", "/PID", target],
+                    check=False,
+                    **_get_hidden_kwargs()
+                )
             else:
                 name = target if target.endswith(".exe") else f"{target}.exe"
-                subprocess.run(["taskkill", "/F", "/IM", name], check=False)
+                subprocess.run(
+                    ["taskkill", "/F", "/IM", name],
+                    check=False,
+                    **_get_hidden_kwargs()
+                )
             return f"Terminated process: {target}"
         except Exception as e:
             return f"[Kill Error]: {e}"
