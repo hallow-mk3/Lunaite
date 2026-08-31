@@ -8,7 +8,7 @@ setup(
     version="3.0.0",
     author="Swasthik Shetty",
     author_email="swasthik.mk3@gmail.com",
-    description="Lunaite — Universal Modular AI Architecture Framework (Sparse MoE, Cognitive Deliberation, Persistent Memory, Autonomous Agent Tools)",
+    description="Lunaite — Intelligent Tool-Selection Harness and Lightweight Agent Toolkit for LLMs",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/hallow-mk3/Lunaite",

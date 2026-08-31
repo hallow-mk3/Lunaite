@@ -8,7 +8,7 @@ version = "3.0.0"
 authors = [
     { name="Swasthik Shetty", email="swasthik.mk3@gmail.com" },
 ]
-description = "Lunaite — Universal Modular AI Architecture Framework (Sparse MoE, Cognitive Deliberation, Persistent Memory, Autonomous Agent Tools)"
+description = "Lunaite — Intelligent Tool-Selection Harness and Lightweight Agent Toolkit for LLMs"
 readme = "README.md"
 requires-python = ">=3.8"
 classifiers = [

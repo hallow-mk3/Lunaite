@@ -16,16 +16,24 @@
 
 ---
 
-### Why Lunaite?
+## 📖 About Lunaite
 
-When you give an LLM 30+ tools, the default approach is usually to dump every single JSON schema into the system prompt. 
+**Lunaite** is a modular tool-selection harness and agent toolkit designed to make function-calling in LLMs reliable, fast, and token-efficient.
 
-As your tool library grows, this causes three big problems:
-1. **Token bills skyrocket** from repeating dozens of unused schemas on every call.
-2. **Context windows get crowded**, leaving less room for user history and data.
-3. **Models get confused**, frequently picking the wrong tool or hallucinating parameters.
+### The Problem
+When building agentic workflows or tool-augmented LLMs with 30+ tools, developers typically take the default route: dumping every single JSON schema into the model's system prompt.
 
-**Lunaite** fixes this by retrieving and injecting **only the tools relevant to the prompt** before calling the model — saving up to **90% of your tool-related tokens** while boosting tool selection accuracy.
+As your tool registry grows, this causes three critical issues:
+1. **Token Bloat & Skyrocketing Costs:** Repeating dozens of unused tool schemas on every turn wastes thousands of tokens.
+2. **Context Window Contention:** Tool definitions crowd out crucial conversation history, system instructions, and user context.
+3. **Model Distraction & Hallucination:** Models face "distractor overload", frequently selecting the wrong tool or fabricating invalid argument parameters.
+
+### The Solution
+Lunaite dynamically retrieves and passes **only the most relevant tools** to the LLM for each user prompt:
+- **Dense Vector Semantic Search (`RetrievalSelector`)**: Embeds queries and tool signatures to pick the top-$k$ candidates with sentence transformers.
+- **Hybrid Fusion (`HybridSelector`)**: Combines dense vector similarity with lexical BM25 token matching via Reciprocal Rank Fusion (RRF).
+- **Execution Harness & Telemetry**: Full lifecycle logging with schema validation, argument coercion, and non-destructive execution safety.
+- **Measurable Results**: Saves **up to 90% in tool prompt tokens** while improving end-to-end task completion rates.
 
 ---
 
