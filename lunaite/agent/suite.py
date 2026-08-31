@@ -132,11 +132,17 @@ class LunaiteAgent:
             return ("telemetry", "")
         if any(k in prompt_lower for k in ["take a screenshot", "capture screen"]):
             return ("screenshot", "")
-        if any(k in prompt_lower for k in [
-            "read clipboard", "clipboard content", "clipboard", "what's in clipboard",
-            "whats in clipboard", "what is in clipboard", "what's copied", "check clipboard",
-            "show clipboard", "paste", "what did i copy"
-        ]):
+        clipboard_triggers = [
+            "read clipboard", "clipboard content", "what's in clipboard",
+            "whats in clipboard", "what is in clipboard", "what's copied",
+            "check clipboard", "show clipboard", "what did i copy",
+            "what do i have in clipboard", "get clipboard",
+        ]
+        # Also catch bare "clipboard" only when it appears as a standalone concept (not e.g. "copy to clipboard")
+        bare_clipboard = bool(re.search(r'\bclipboard\b', prompt_lower)) and not any(
+            x in prompt_lower for x in ["copy to clipboard", "paste into", "write to clipboard", "send to clipboard"]
+        )
+        if any(k in prompt_lower for k in clipboard_triggers) or bare_clipboard:
             return ("clipboard_read", "")
 
         # 8. Conversational greetings to skip

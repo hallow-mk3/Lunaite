@@ -675,12 +675,65 @@ def run_chat_cli(
                 continue
 
             # ─────────────────────────────────────────────────────────────
-            # 17. /help — Command overview
+            # 17. /models — List available models or switch model mid-session
+            # ─────────────────────────────────────────────────────────────
+            elif cmd_lower in ["/models", "/model"]:
+                if not arg:
+                    local_m, api_m = discover_available_models()
+                    all_m = local_m + api_m
+                    print(f"\n{CYAN_MAIN}╭──────────────────── Model Switcher ──────────────────────╮{C_RESET}")
+                    print(f"  {SLATE}Active:{C_RESET} {GREEN_ACCENT}{C_BOLD}{model_name}{C_RESET} {SLATE_DARK}({backend or 'ollama'}){C_RESET}\n")
+                    if local_m:
+                        print(f"  {CYAN_BRIGHT}Local Models:{C_RESET}")
+                        for idx, m in enumerate(local_m, 1):
+                            marker = f"{GREEN_ACCENT}✓{C_RESET}" if m["name"] == model_name else " "
+                            print(f"   {marker} {CYAN_MAIN}[{idx}]{C_RESET} {WHITE_BOLD}{m['name']:<24}{C_RESET} {SLATE_DARK}{m['desc']}{C_RESET}")
+                    if api_m:
+                        print(f"\n  {CYAN_BRIGHT}Cloud API Models:{C_RESET}")
+                        for idx, m in enumerate(api_m, len(local_m) + 1):
+                            marker = f"{GREEN_ACCENT}✓{C_RESET}" if m["name"] == model_name else " "
+                            print(f"   {marker} {CYAN_MAIN}[{idx}]{C_RESET} {WHITE_BOLD}{m['name']:<24}{C_RESET} {SLATE_DARK}{m['desc']}{C_RESET}")
+                    print(f"\n  {SLATE}Switch: {CYAN_MAIN}/model <name or number>{SLATE}  e.g. {CYAN_MAIN}/model qwen3:8b{C_RESET}")
+                    print(f"{CYAN_MAIN}╰──────────────────────────────────────────────────────────╯{C_RESET}\n")
+                else:
+                    local_m, api_m = discover_available_models()
+                    all_m = local_m + api_m
+                    new_model_name, new_backend = None, None
+
+                    if arg.isdigit():
+                        pick = int(arg) - 1
+                        if 0 <= pick < len(all_m):
+                            new_model_name = all_m[pick]["name"]
+                            new_backend = all_m[pick]["backend"]
+                    else:
+                        for m in all_m:
+                            if arg.lower() in m["name"].lower() or m["name"].lower() in arg.lower():
+                                new_model_name = m["name"]
+                                new_backend = m["backend"]
+                                break
+                        if not new_model_name:
+                            new_model_name = arg
+                            new_backend = "api" if arg.startswith(("gpt-", "claude-")) else "ollama"
+
+                    if new_model_name:
+                        old_name = model_name
+                        model_name = new_model_name
+                        backend = new_backend
+                        model = wrap(model_name, backend=backend)
+                        print(f"  {GREEN_ACCENT}✓ Switched:{C_RESET} {SLATE_DARK}{old_name}{C_RESET} → {WHITE_BOLD}{model_name}{C_RESET} {SLATE_DARK}({backend}){C_RESET}")
+                        print(f"  {SLATE}History and memory are preserved across the switch.{C_RESET}\n")
+                    else:
+                        print(f"  {RED_ACCENT}Model not found:{C_RESET} {arg}\n")
+                continue
+
+            # ─────────────────────────────────────────────────────────────
+            # 18. /help — Command overview
             # ─────────────────────────────────────────────────────────────
             elif cmd_lower in ["/help", "/?"]:
                 print(f"\n{CYAN_MAIN}╭─────────────────── Available Commands ───────────────────╮{C_RESET}")
                 print(f"  {CYAN_BRIGHT}/add-dir{C_RESET} [path]  {SLATE_LIGHT}Add new working directory to session context{C_RESET}")
                 print(f"  {CYAN_BRIGHT}/cd{C_RESET} <path>       {SLATE_LIGHT}Move session to a new working directory{C_RESET}")
+                print(f"  {CYAN_BRIGHT}/models{C_RESET} [name]   {SLATE_LIGHT}List available models or switch active model{C_RESET}")
                 print(f"  {CYAN_BRIGHT}/context{C_RESET}         {SLATE_LIGHT}Visualize current context usage as a colored grid{C_RESET}")
                 print(f"  {CYAN_BRIGHT}/compact{C_RESET}         {SLATE_LIGHT}Free context by summarizing conversation so far{C_RESET}")
                 print(f"  {CYAN_BRIGHT}/autocompact{C_RESET}     {SLATE_LIGHT}Set context fill % before auto-summarizing{C_RESET}")
