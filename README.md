@@ -5,9 +5,12 @@
 <h1 align="center">Lunaite</h1>
 
 <p align="center">
+  <a href="https://github.com/hallow-mk3/Lunaite/releases"><img src="https://img.shields.io/github/v/release/hallow-mk3/Lunaite?color=blue&label=Release" alt="Release" /></a>
+  <a href="https://pypi.org/project/lunaite/"><img src="https://img.shields.io/badge/Package-PyPI-blue.svg" alt="Package" /></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.8+-3776ab.svg" alt="Python: 3.8+" /></a>
   <a href="https://ollama.com/"><img src="https://img.shields.io/badge/Ollama-Native-black.svg" alt="Ollama Compatible" /></a>
+  <a href="https://github.com/hallow-mk3/Lunaite/deployments"><img src="https://img.shields.io/badge/Deployment-Local%20%7C%20Ollama%20%7C%20API-informational.svg" alt="Deployments" /></a>
 </p>
 
 <p align="center">
@@ -39,12 +42,19 @@ Lunaite dynamically retrieves and passes **only the most relevant tools** to the
 
 ## ⚡ Quick Start
 
-### Installation
+### Installation & Packaging
+Install directly from source or via package manager:
 
 ```bash
+# Clone and install locally in editable mode
 git clone https://github.com/hallow-mk3/Lunaite.git
 cd Lunaite
 pip install -e .
+```
+
+```bash
+# Or install directly from GitHub:
+pip install git+https://github.com/hallow-mk3/Lunaite.git
 ```
 
 *Optional extras:*
@@ -55,6 +65,12 @@ pip install sentence-transformers
 # For benchmark plots & visual analytics:
 pip install matplotlib numpy
 ```
+
+### Deployment Targets
+Lunaite integrates seamlessly across various deployment environments:
+- **Local Ollama**: Connect directly to local instances via `http://localhost:11434/v1` (e.g. `qwen2.5:7b`, `llama3.1:8b`).
+- **OpenAI-Compatible APIs**: vLLM, LMDeploy, FastChat, OpenRouter, Groq, or OpenAI endpoints.
+- **HuggingFace Checkpoints & PyTorch**: Direct model wrapping for research pipelines.
 
 ---
 
